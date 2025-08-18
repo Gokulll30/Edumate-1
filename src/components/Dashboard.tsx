@@ -125,7 +125,10 @@ export default function Dashboard() {
                     <span className="text-white text-sm w-12">0h</span>
                   </div>
                 );
-              Ready to start your learning journey? Create your first study session!
+              })}
+              <div className="text-center py-4">
+                <p className="text-slate-400">Ready to start your learning journey? Create your first study session!</p>
+              </div>
             </div>
           </div>
 
@@ -188,15 +191,6 @@ export default function Dashboard() {
                 );
               })
             )}
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
-                </div>
-              );
-            })}
           </div>
         </div>
       </main>
