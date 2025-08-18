@@ -20,41 +20,6 @@ export default function StudyPlanner() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [sessions, setSessions] = useState<StudySession[]>([
-    {
-      id: '1',
-      title: 'Algorithm Analysis Review',
-      subject: 'Computer Science',
-      duration: 120,
-      date: '2025-01-14',
-      time: '14:00',
-      type: 'study',
-      priority: 'high',
-      completed: false,
-      notes: 'Focus on time complexity and Big O notation'
-    },
-    {
-      id: '2',
-      title: 'Database Design Quiz',
-      subject: 'Database Systems',
-      duration: 45,
-      date: '2025-01-14',
-      time: '16:30',
-      type: 'quiz',
-      priority: 'medium',
-      completed: true
-    },
-    {
-      id: '3',
-      title: 'Machine Learning Project',
-      subject: 'AI/ML',
-      duration: 180,
-      date: '2025-01-15',
-      time: '10:00',
-      type: 'project',
-      priority: 'high',
-      completed: false,
-      notes: 'Work on neural network implementation'
-    }
   ]);
 
   const [newSession, setNewSession] = useState({

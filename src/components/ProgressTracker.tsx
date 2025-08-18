@@ -24,10 +24,10 @@ export default function ProgressTracker() {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   
   const subjects: Subject[] = [
-    { name: 'Computer Science', progress: 78, totalHours: 24.5, completedSessions: 18, averageScore: 87, color: 'purple' },
-    { name: 'Mathematics', progress: 65, totalHours: 18.2, completedSessions: 14, averageScore: 82, color: 'blue' },
-    { name: 'Database Systems', progress: 92, totalHours: 16.8, completedSessions: 12, averageScore: 94, color: 'green' },
-    { name: 'Machine Learning', progress: 45, totalHours: 12.3, completedSessions: 8, averageScore: 76, color: 'orange' }
+    { name: 'Computer Science', progress: 0, totalHours: 0, completedSessions: 0, averageScore: 0, color: 'purple' },
+    { name: 'Mathematics', progress: 0, totalHours: 0, completedSessions: 0, averageScore: 0, color: 'blue' },
+    { name: 'Database Systems', progress: 0, totalHours: 0, completedSessions: 0, averageScore: 0, color: 'green' },
+    { name: 'Machine Learning', progress: 0, totalHours: 0, completedSessions: 0, averageScore: 0, color: 'orange' }
   ];
 
   const achievements: Achievement[] = [
@@ -36,16 +36,14 @@ export default function ProgressTracker() {
       title: 'Study Streak Master',
       description: 'Study for 7 consecutive days',
       icon: Award,
-      completed: true,
-      completedDate: '2025-01-10'
+      completed: false
     },
     {
       id: '2',
       title: 'Quiz Champion',
       description: 'Score above 90% in 5 quizzes',
       icon: Target,
-      completed: true,
-      completedDate: '2025-01-08'
+      completed: false
     },
     {
       id: '3',
@@ -66,19 +64,18 @@ export default function ProgressTracker() {
       title: 'AI Assistant Pro',
       description: 'Use AI chat for 30+ conversations',
       icon: Brain,
-      completed: true,
-      completedDate: '2025-01-12'
+      completed: false
     }
   ];
 
   const weeklyData = [
-    { day: 'Mon', hours: 3.5, score: 85 },
-    { day: 'Tue', hours: 2.8, score: 92 },
-    { day: 'Wed', hours: 4.2, score: 78 },
-    { day: 'Thu', hours: 3.1, score: 88 },
-    { day: 'Fri', hours: 2.5, score: 91 },
-    { day: 'Sat', hours: 5.2, score: 83 },
-    { day: 'Sun', hours: 3.8, score: 89 }
+    { day: 'Mon', hours: 0, score: 0 },
+    { day: 'Tue', hours: 0, score: 0 },
+    { day: 'Wed', hours: 0, score: 0 },
+    { day: 'Thu', hours: 0, score: 0 },
+    { day: 'Fri', hours: 0, score: 0 },
+    { day: 'Sat', hours: 0, score: 0 },
+    { day: 'Sun', hours: 0, score: 0 }
   ];
 
   const getSubjectColor = (color: string) => {
@@ -103,9 +100,9 @@ export default function ProgressTracker() {
 
   const overallStats = {
     totalHours: subjects.reduce((acc, s) => acc + s.totalHours, 0),
-    averageScore: Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length),
+    averageScore: subjects.length > 0 ? Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length) : 0,
     completedAchievements: achievements.filter(a => a.completed).length,
-    studyStreak: 12
+    studyStreak: 0
   };
 
   return (

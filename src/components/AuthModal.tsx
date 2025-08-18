@@ -12,9 +12,11 @@ export default function AuthModal() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
     
     try {
@@ -24,13 +26,14 @@ export default function AuthModal() {
         await signup(formData.name, formData.email, formData.password);
       }
     } catch (error) {
-      console.error('Auth error:', error);
+      setError(error.message || 'An error occurred');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError('');
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
@@ -55,6 +58,11 @@ export default function AuthModal() {
             </button>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm">
+              {error}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="relative">

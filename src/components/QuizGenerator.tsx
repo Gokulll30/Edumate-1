@@ -26,30 +26,6 @@ export default function QuizGenerator() {
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [quizHistory, setQuizHistory] = useState<Quiz[]>([
-    {
-      id: '1',
-      title: 'Data Structures and Algorithms',
-      questions: [],
-      createdAt: '2025-01-13',
-      score: 85,
-      completed: true
-    },
-    {
-      id: '2',
-      title: 'Database Management Systems',
-      questions: [],
-      createdAt: '2025-01-12',
-      score: 92,
-      completed: true
-    },
-    {
-      id: '3',
-      title: 'Operating Systems Concepts',
-      questions: [],
-      createdAt: '2025-01-11',
-      score: 78,
-      completed: true
-    }
   ]);
 
   const sampleQuestions: Question[] = [

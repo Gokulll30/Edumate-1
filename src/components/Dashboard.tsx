@@ -21,25 +21,15 @@ export default function Dashboard() {
   const [selectedTimeframe, setSelectedTimeframe] = useState('week');
 
   const stats = [
-    { label: 'Study Hours', value: '24.5', change: '+12%', icon: Clock, color: 'purple' },
-    { label: 'Completed Sessions', value: '18', change: '+8%', icon: CheckCircle2, color: 'green' },
-    { label: 'Average Score', value: '87%', change: '+5%', icon: Target, color: 'blue' },
-    { label: 'Streak Days', value: '12', change: '+3%', icon: Award, color: 'orange' }
+    { label: 'Study Hours', value: '0', change: '+0%', icon: Clock, color: 'purple' },
+    { label: 'Completed Sessions', value: '0', change: '+0%', icon: CheckCircle2, color: 'green' },
+    { label: 'Average Score', value: '0%', change: '+0%', icon: Target, color: 'blue' },
+    { label: 'Streak Days', value: '0', change: '+0%', icon: Award, color: 'orange' }
   ];
 
-  const recentActivity = [
-    { type: 'quiz', title: 'Data Structures Quiz', score: 92, time: '2 hours ago' },
-    { type: 'study', title: 'Algorithm Analysis', duration: '1.5 hours', time: '4 hours ago' },
-    { type: 'upload', title: 'Computer Networks PDF', size: '2.3 MB', time: '1 day ago' },
-    { type: 'chat', title: 'AI Study Session', messages: 12, time: '1 day ago' }
-  ];
+  const recentActivity = [];
 
-  const upcomingTasks = [
-    { title: 'Operating Systems Quiz', due: 'Today, 3:00 PM', priority: 'high' },
-    { title: 'Database Design Project', due: 'Tomorrow, 11:59 PM', priority: 'medium' },
-    { title: 'Review Machine Learning Notes', due: 'Friday, 2:00 PM', priority: 'low' },
-    { title: 'Prepare for Data Structures Exam', due: 'Next Monday', priority: 'high' }
-  ];
+  const upcomingTasks = [];
 
   const getStatColor = (color: string) => {
     const colors = {
@@ -122,21 +112,20 @@ export default function Dashboard() {
             
             {/* Simplified chart representation */}
             <div className="space-y-4">
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
-                const height = Math.random() * 80 + 20;
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
                 return (
                   <div key={day} className="flex items-center space-x-4">
                     <span className="text-slate-400 text-sm w-8">{day}</span>
                     <div className="flex-1 bg-slate-700 rounded-full h-2">
                       <div 
                         className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${height}%` }}
+                        style={{ width: '0%' }}
                       />
                     </div>
-                    <span className="text-white text-sm w-12">{Math.floor(height/10)}h</span>
+                    <span className="text-white text-sm w-12">0h</span>
                   </div>
                 );
-              })}
+              Ready to start your learning journey? Create your first study session!
             </div>
           </div>
 
@@ -144,17 +133,25 @@ export default function Dashboard() {
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
             <h3 className="text-xl font-semibold text-white mb-6">Upcoming Tasks</h3>
             <div className="space-y-4">
-              {upcomingTasks.map((task, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:border-purple-500/30 transition-all duration-300">
-                  <div className="flex-1">
-                    <h4 className="text-white font-medium mb-1">{task.title}</h4>
-                    <p className="text-slate-400 text-sm">{task.due}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                    {task.priority}
-                  </span>
+              {upcomingTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                  <p className="text-slate-400">No upcoming tasks</p>
+                  <p className="text-slate-500 text-sm mt-2">Create your first study session to get started!</p>
                 </div>
-              ))}
+              ) : (
+                upcomingTasks.map((task, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:border-purple-500/30 transition-all duration-300">
+                    <div className="flex-1">
+                      <h4 className="text-white font-medium mb-1">{task.title}</h4>
+                      <p className="text-slate-400 text-sm">{task.due}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
+                      {task.priority}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -163,23 +160,40 @@ export default function Dashboard() {
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
           <h3 className="text-xl font-semibold text-white mb-6">Recent Activity</h3>
           <div className="space-y-4">
-            {recentActivity.map((activity, index) => {
-              const Icon = getActivityIcon(activity.type);
-              return (
-                <div key={index} className="flex items-center space-x-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:border-purple-500/30 transition-all duration-300">
-                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-white" />
+            {recentActivity.length === 0 ? (
+              <div className="text-center py-8">
+                <BarChart3 className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                <p className="text-slate-400">No recent activity</p>
+                <p className="text-slate-500 text-sm mt-2">Start studying to see your activity here!</p>
+              </div>
+            ) : (
+              recentActivity.map((activity, index) => {
+                const Icon = getActivityIcon(activity.type);
+                return (
+                  <div key={index} className="flex items-center space-x-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600/50 hover:border-purple-500/30 transition-all duration-300">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-medium">{activity.title}</h4>
+                      <p className="text-slate-400 text-sm">
+                        {'score' in activity && `Score: ${activity.score}%`}
+                        {'duration' in activity && `Duration: ${activity.duration}`}
+                        {'size' in activity && `Size: ${activity.size}`}
+                        {'messages' in activity && `${activity.messages} messages`}
+                      </p>
+                    </div>
+                    <span className="text-slate-400 text-sm">{activity.time}</span>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="text-white font-medium">{activity.title}</h4>
-                    <p className="text-slate-400 text-sm">
-                      {'score' in activity && `Score: ${activity.score}%`}
-                      {'duration' in activity && `Duration: ${activity.duration}`}
-                      {'size' in activity && `Size: ${activity.size}`}
-                      {'messages' in activity && `${activity.messages} messages`}
-                    </p>
-                  </div>
-                  <span className="text-slate-400 text-sm">{activity.time}</span>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
                 </div>
               );
             })}

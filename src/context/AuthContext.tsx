@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authAPI } from '../services/api';
 
 interface User {
   id: string;
@@ -11,6 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -22,43 +24,69 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+      
+      if (token && savedUser) {
+        try {
+          const userData = await authAPI.getProfile();
+          setUser(userData);
+        } catch (error) {
+          console.error('Failed to get user profile:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+      setLoading(false);
+    };
+
+    initializeAuth();
+  }, []);
   const login = async (email: string, password: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser({
-      id: '1',
-      name: 'Alex Johnson',
-      email,
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
-      studyGoals: ['Computer Science Degree', 'Software Engineering Internship'],
-      learningStyle: 'Visual Learner'
-    });
-    setShowAuthModal(false);
+    try {
+      const response = await authAPI.login({ email, password });
+      
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      setUser(response.user);
+      setShowAuthModal(false);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw new Error(error.response?.data?.error || 'Login failed');
+    }
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser({
-      id: '1',
-      name,
-      email,
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
-      studyGoals: [],
-      learningStyle: 'Visual Learner'
-    });
-    setShowAuthModal(false);
+    try {
+      const response = await authAPI.signup({ name, email, password });
+      
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      setUser(response.user);
+      setShowAuthModal(false);
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw new Error(error.response?.data?.error || 'Signup failed');
+    }
   };
 
   const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
   return (
     <AuthContext.Provider value={{
       user,
+      loading,
       login,
       signup,
       logout,
