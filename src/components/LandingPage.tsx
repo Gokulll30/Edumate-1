@@ -9,7 +9,7 @@ export default function LandingPage() {
     {
       icon: Brain,
       title: 'AI Study Assistant',
-      description: 'Get personalized study plans and reminders powered by advanced AI'
+      description: 'Get personalized study plans and reminders powered by Edumate'
     },
     {
       icon: Upload,
@@ -71,7 +71,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-sm px-4 py-2 rounded-full border border-purple-500/30 mb-8">
             <Zap className="w-4 h-4 text-purple-400" />
-            <span className="text-purple-300 font-medium">Powered by Advanced AI</span>
+            <span className="text-purple-300 font-medium">Powered by Edumate</span>
           </div>
           
           <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent mb-6 leading-tight">
