@@ -21,6 +21,7 @@ function AppContent() {
         <Route path="/planner" element={user ? <StudyPlanner /> : <Navigate to="/" />} />
         <Route path="/progress" element={user ? <ProgressTracker /> : <Navigate to="/" />} />
         <Route path="/quiz" element={user ? <QuizGenerator /> : <Navigate to="/" />} />
+        <Route path="*" element={<QuizGenerator />} />
       </Routes>
       <AuthModal />
     </div>
