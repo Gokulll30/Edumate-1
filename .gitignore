@@ -23,3 +23,24 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Node / Vite
+node_modules
+dist
+.vite
+frontend/node_modules
+frontend/dist
+
+# Python / Flask
+backend/.venv
+backend/venv
+backend/__pycache__
+backend/*.pyc
+
+# OS
+.DS_Store
+
+# Env
+frontend/.env
+backend/.env
+
