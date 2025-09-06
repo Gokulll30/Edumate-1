@@ -11,7 +11,7 @@ export default function QuizGenerator() {
   const [quiz, setQuiz] = useState<QuizItem[]>([]);
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<{correct:boolean; text:string; correctLetter?:string} | null>(null);
+  const [feedback, setFeedback] = useState<{ correct: boolean; text: string; correctLetter?: string } | null>(null);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
 
@@ -35,7 +35,7 @@ export default function QuizGenerator() {
       const data = await uploadNotesForQuiz(file, numQ, difficulty);
       if (!data.success) throw new Error(data.error || "Quiz generation failed");
       setQuiz(data.quiz);
-    } catch (err:any) {
+    } catch (err: any) {
       alert(err.message || "Failed to generate quiz");
     } finally {
       setLoading(false);
@@ -48,9 +48,9 @@ export default function QuizGenerator() {
     setFeedback({
       correct: res.correct,
       text: `${res.correct ? "Correct" : "Incorrect"} — ${res.explanation}`,
-      correctLetter: res.correct ? undefined : res.correctLetter
+      correctLetter: res.correct ? undefined : res.correctLetter,
     });
-    if (res.correct) setScore(s => s + 1);
+    if (res.correct) setScore((s) => s + 1);
   };
 
   const handleNext = () => {
@@ -58,7 +58,7 @@ export default function QuizGenerator() {
       setFinished(true);
       return;
     }
-    setCurrent(i => i + 1);
+    setCurrent((i) => i + 1);
     setSelected(null);
     setFeedback(null);
   };
@@ -76,22 +76,35 @@ export default function QuizGenerator() {
             <input
               type="file"
               accept=".pdf,.txt"
-              onChange={(e) => setFile(e.target.files && e.target.files ? e.target.files : null)}
+              onChange={(e) => setFile(e.target.files?. || null)}
               className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
             />
-            <select className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
-                    value={difficulty} onChange={e=>setDifficulty(e.target.value)}>
+            <select
+              className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value)}
+            >
               <option value="mixed">Mixed</option>
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
               <option value="hard">Hard</option>
             </select>
-            <select className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
-                    value={numQ} onChange={e=>setNumQ(parseInt(e.target.value))}>
-              {[3,5,8,10].map(n => <option key={n} value={n}>{n} Questions</option>)}
+            <select
+              className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
+              value={numQ}
+              onChange={(e) => setNumQ(parseInt(e.target.value))}
+            >
+              {[3, 5, 8, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n} Questions
+                </option>
+              ))}
             </select>
-            <button onClick={handleGenerate} disabled={loading}
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-4 py-2 rounded-lg">
+            <button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-4 py-2 rounded-lg"
+            >
               {loading ? "Generating..." : "Generate Quiz"}
             </button>
           </div>
@@ -113,32 +126,41 @@ export default function QuizGenerator() {
             <h2 className="text-2xl font-semibold mb-4">{quiz[current].question}</h2>
             <div className="space-y-3 mb-4">
               {quiz[current].options.map((opt, idx) => (
-                <label key={idx} className={`block p-3 rounded border cursor-pointer ${
-                  selected===idx ? "border-indigo-400 bg-indigo-500/10" : "border-slate-700 hover:bg-slate-800"
-                }`}>
-                  <input type="radio" name="opt" className="mr-3"
-                         checked={selected===idx}
-                         onChange={()=> setSelected(idx)} />
-                  <span>{String.fromCharCode(65+idx)}. {opt}</span>
+                <label
+                  key={idx}
+                  className={`block p-3 rounded border cursor-pointer ${
+                    selected === idx ? "border-indigo-400 bg-indigo-500/10" : "border-slate-700 hover:bg-slate-800"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="opt"
+                    className="mr-3"
+                    checked={selected === idx}
+                    onChange={() => setSelected(idx)}
+                  />
+                  <span>
+                    {String.fromCharCode(65 + idx)}. {opt}
+                  </span>
                 </label>
               ))}
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handleSubmit}
-                      className="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg">
+              <button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg">
                 Submit Answer
               </button>
-              <button onClick={handleNext}
-                      className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">
+              <button onClick={handleNext} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">
                 {current >= quiz.length - 1 ? "Finish" : "Next"}
               </button>
             </div>
 
             {feedback && (
-              <div className={`mt-4 p-3 rounded border ${
-                feedback.correct ? "border-emerald-600 bg-emerald-900/30" : "border-rose-600 bg-rose-900/30"
-              }`}>
+              <div
+                className={`mt-4 p-3 rounded border ${
+                  feedback.correct ? "border-emerald-600 bg-emerald-900/30" : "border-rose-600 bg-rose-900/30"
+                }`}
+              >
                 <div>{feedback.text}</div>
                 {!feedback.correct && (
                   <div className="mt-1 text-slate-200">
@@ -154,9 +176,8 @@ export default function QuizGenerator() {
         {quiz.length > 0 && finished && (
           <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-6">
             <h3 className="text-2xl font-bold mb-2">Quiz Completed!</h3>
-            <p className="text-slate-300 mb-4">You scored {Math.round((score/quiz.length)*100)}%</p>
-            <button onClick={()=>resetState()}
-                    className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg">
+            <p className="text-slate-300 mb-4">You scored {Math.round((score / quiz.length) * 100)}%</p>
+            <button onClick={() => resetState()} className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg">
               Generate New Quiz
             </button>
           </div>
