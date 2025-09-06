@@ -10,7 +10,7 @@ export type QuizItem = {
 };
 
 // Same-origin base. Empty string means “use current origin”
-const API_BASE = "https://edumate-2026.vercel.app";
+const API_BASE = "";
 
 export async function uploadNotesForQuiz(file: File, numQ = 5, difficulty = "mixed") {
   const fd = new FormData();
