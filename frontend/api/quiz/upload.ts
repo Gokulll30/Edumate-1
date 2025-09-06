@@ -1,6 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// IMPORTANT: import the function implementation directly to avoid the package's CLI/sample path
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import * as pdfParseMod from 'pdf-parse/lib/pdf-parse.js';
+const pdfParse = (pdfParseMod as any).default || (pdfParseMod as any);
+
 // JSON schema for Gemini JSON mode
 const MCQ_SCHEMA = {
   type: 'array',
@@ -56,7 +62,7 @@ function normalize(items: any[]) {
   });
 }
 
-// Important: disable default body parsing so we can stream multipart
+// Disable default body parsing so we can stream multipart
 export const config = { api: { bodyParser: false } };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -103,10 +109,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let text = '';
     if (isPdf) {
-      // Dynamic import to always use the Buffer API (avoids demo/CLI path)
-      const { default: pdfParse } = await import('pdf-parse');
-      const parsed = await pdfParse(buf);
-      text = parsed.text || '';
+      // Use direct function import; parse from Buffer only (no filesystem)
+      const parsed = await (pdfParse as any)(buf);
+      text = parsed?.text || '';
     } else if (lower.endsWith('.txt')) {
       text = buf.toString('utf-8');
     } else {
@@ -138,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
-    const raw = result.response.text(); // strict JSON string
+    const raw = result.response.text();
     const items = JSON.parse(raw);
     const quiz = normalize(items);
 
