@@ -1,4 +1,3 @@
-// src/services/api.ts
 export type QuizItem = {
   question: string;
   options: string[];
@@ -9,34 +8,76 @@ export type QuizItem = {
   topic: string;
 };
 
-// Same-origin base. Empty string means “use current origin”
-const API_BASE = "";
+export type QuizResponse = {
+  success: boolean;
+  quiz: QuizItem[];
+  error?: string;
+};
 
-export async function uploadNotesForQuiz(file: File, numQ = 5, difficulty = "mixed") {
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("num_q", String(numQ));
-  fd.append("difficulty", difficulty);
+export type AnswerCheckResponse = {
+  correct: boolean;
+  correctIndex: number;
+  correctLetter: string;
+  explanation: string;
+  error?: string;
+};
 
-  const res = await fetch(`${API_BASE}/api/quiz/upload`, {
-    method: "POST",
-    body: fd,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ success: boolean; quiz: QuizItem[]; error?: string }>;
+// Use environment variable for API base URL
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
+
+export async function uploadNotesForQuiz(
+  file: File,
+  numQ: number = 5,
+  difficulty: string = "mixed"
+): Promise<QuizResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("num_q", String(numQ));
+  formData.append("difficulty", difficulty);
+
+  try {
+    const response = await fetch(`${API_BASE}/quiz`, {  // Simplified endpoint
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Quiz generation error:", error);
+    throw error;
+  }
 }
 
-export async function checkAnswer(quiz: QuizItem[], questionIndex: number, selectedIndex: number) {
-  const res = await fetch(`${API_BASE}/api/quiz/check`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ quiz, questionIndex, selectedIndex }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{
-    correct: boolean;
-    correctIndex: number;
-    correctLetter: string;
-    explanation: string;
-  }>;
+export async function checkAnswer(
+  quiz: QuizItem[],
+  questionIndex: number,
+  selectedIndex: number
+): Promise<AnswerCheckResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/check`, {  // Simplified endpoint
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quiz, questionIndex, selectedIndex }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Answer check error:", error);
+    throw error;
+  }
+}
+
+export async function checkHealth(): Promise<{ status: string; service: string }> {
+  const response = await fetch(`${API_BASE}/health`);
+  return await response.json();
 }

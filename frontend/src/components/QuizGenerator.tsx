@@ -1,188 +1,257 @@
-import React, { useState } from "react";
-import Navigation from "./Navigation";
-import { uploadNotesForQuiz, checkAnswer, QuizItem } from "../services/api";
+import React, { useState } from 'react';
+import { uploadNotesForQuiz, checkAnswer, QuizItem } from '../services/api';
 
-export default function QuizGenerator() {
+const QuizGenerator: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [numQ, setNumQ] = useState(5);
-  const [difficulty, setDifficulty] = useState("mixed");
-  const [loading, setLoading] = useState(false);
-
+  const [difficulty, setDifficulty] = useState('mixed');
   const [quiz, setQuiz] = useState<QuizItem[]>([]);
   const [current, setCurrent] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<{ correct: boolean; text: string; correctLetter?: string } | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<any>(null);
   const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  const resetState = () => {
-    setQuiz([]);
-    setCurrent(0);
-    setSelected(null);
-    setFeedback(null);
-    setScore(0);
-    setFinished(false);
-  };
-
-  const handleGenerate = async () => {
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!file) {
-      alert("Please choose a PDF or TXT file.");
+      setError('Please select a file');
       return;
     }
-    resetState();
+
     setLoading(true);
+    setError('');
+    
     try {
-      const data = await uploadNotesForQuiz(file, numQ, difficulty);
-      if (!data.success) throw new Error(data.error || "Quiz generation failed");
-      setQuiz(data.quiz);
-    } catch (err: any) {
-      alert(err.message || "Failed to generate quiz");
+      const result = await uploadNotesForQuiz(file, numQ, difficulty);
+      
+      if (result.success && result.quiz) {
+        setQuiz(result.quiz);
+        setCurrent(0);
+        setScore(0);
+        setCompleted(false);
+        setSelectedAnswer(null);
+        setFeedback(null);
+      } else {
+        setError(result.error || 'Failed to generate quiz');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async () => {
-    if (selected == null) return;
-    const res = await checkAnswer(quiz, current, selected);
-    setFeedback({
-      correct: res.correct,
-      text: `${res.correct ? "Correct" : "Incorrect"} — ${res.explanation}`,
-      correctLetter: res.correct ? undefined : res.correctLetter,
-    });
-    if (res.correct) setScore((s) => s + 1);
+  const handleAnswerSubmit = async () => {
+    if (selectedAnswer === null) return;
+
+    try {
+      const result = await checkAnswer(quiz, current, selectedAnswer);
+      setFeedback(result);
+      
+      if (result.correct) {
+        setScore(score + 1);
+      }
+    } catch (err) {
+      console.error('Error checking answer:', err);
+    }
   };
 
   const handleNext = () => {
-    if (current >= quiz.length - 1) {
-      setFinished(true);
-      return;
+    if (current < quiz.length - 1) {
+      setCurrent(current + 1);
+      setSelectedAnswer(null);
+      setFeedback(null);
+    } else {
+      setCompleted(true);
     }
-    setCurrent((i) => i + 1);
-    setSelected(null);
-    setFeedback(null);
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-950 text-white flex">
-      <Navigation />
-      <main className="flex-1 p-6 md:p-10">
-        <h1 className="text-3xl font-bold mb-2">Quiz Generator</h1>
-        <p className="text-slate-300 mb-6">Upload study materials and generate personalized quizzes using AI</p>
+  const handleRestart = () => {
+    setQuiz([]);
+    setCurrent(0);
+    setScore(0);
+    setCompleted(false);
+    setSelectedAnswer(null);
+    setFeedback(null);
+    setFile(null);
+  };
 
-        {/* Controls */}
-        <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-4 mb-6">
-          <div className="grid gap-4 md:grid-cols-4 items-center">
-            <input
-              type="file"
-              accept=".pdf,.txt"
-              onChange={(e) => setFile(e.target.files && e.target.files ? e.target.files : null)}
-              className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
+  if (completed) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center">
+        <h2 className="text-3xl font-bold mb-4">Quiz Completed!</h2>
+        <p className="text-xl mb-6">
+          You scored {Math.round((score / quiz.length) * 100)}%
+        </p>
+        <p className="text-lg mb-8">
+          {score} out of {quiz.length} questions correct
+        </p>
+        <button
+          onClick={handleRestart}
+          className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+        >
+          Generate New Quiz
+        </button>
+      </div>
+    );
+  }
+
+  if (quiz.length > 0) {
+    const question = quiz[current];
+    
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="mb-4">
+          <span className="text-sm text-gray-500">
+            Question {current + 1} of {quiz.length}
+          </span>
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all"
+              style={{ width: `${((current + 1) / quiz.length) * 100}%` }}
             />
-            <select
-              className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value)}
-            >
-              <option value="mixed">Mixed</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-            <select
-              className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
-              value={numQ}
-              onChange={(e) => setNumQ(parseInt(e.target.value))}
-            >
-              {[3, 5, 8, 10].map((n) => (
-                <option key={n} value={n}>
-                  {n} Questions
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-4 py-2 rounded-lg"
-            >
-              {loading ? "Generating..." : "Generate Quiz"}
-            </button>
           </div>
         </div>
 
-        {/* Score bar */}
-        {quiz.length > 0 && (
-          <div className="flex justify-between items-center mb-4">
-            <div className="text-slate-300">
-              Question {current + 1} / {quiz.length} • Topic: {quiz[current].topic} • Difficulty: {quiz[current].difficulty}
-            </div>
-            <div className="text-slate-200 font-semibold">Score: {score}</div>
-          </div>
-        )}
+        <h2 className="text-xl font-semibold mb-6">{question.question}</h2>
 
-        {/* Quiz card */}
-        {quiz.length > 0 && !finished && (
-          <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-6">
-            <h2 className="text-2xl font-semibold mb-4">{quiz[current].question}</h2>
-            <div className="space-y-3 mb-4">
-              {quiz[current].options.map((opt, idx) => (
-                <label
-                  key={idx}
-                  className={`block p-3 rounded border cursor-pointer ${
-                    selected === idx ? "border-indigo-400 bg-indigo-500/10" : "border-slate-700 hover:bg-slate-800"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="opt"
-                    className="mr-3"
-                    checked={selected === idx}
-                    onChange={() => setSelected(idx)}
-                  />
-                  <span>
-                    {String.fromCharCode(65 + idx)}. {opt}
-                  </span>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg">
-                Submit Answer
-              </button>
-              <button onClick={handleNext} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">
-                {current >= quiz.length - 1 ? "Finish" : "Next"}
-              </button>
-            </div>
-
-            {feedback && (
-              <div
-                className={`mt-4 p-3 rounded border ${
-                  feedback.correct ? "border-emerald-600 bg-emerald-900/30" : "border-rose-600 bg-rose-900/30"
-                }`}
-              >
-                <div>{feedback.text}</div>
-                {!feedback.correct && (
-                  <div className="mt-1 text-slate-200">
-                    Correct option: <strong>{feedback.correctLetter}</strong>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Summary */}
-        {quiz.length > 0 && finished && (
-          <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-6">
-            <h3 className="text-2xl font-bold mb-2">Quiz Completed!</h3>
-            <p className="text-slate-300 mb-4">You scored {Math.round((score / quiz.length) * 100)}%</p>
-            <button onClick={() => resetState()} className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg">
-              Generate New Quiz
+        <div className="space-y-3 mb-6">
+          {question.options.map((option, index) => (
+            <button
+              key={index}
+              onClick={() => setSelectedAnswer(index)}
+              disabled={feedback !== null}
+              className={`w-full p-3 text-left border rounded-lg transition-colors ${
+                selectedAnswer === index
+                  ? feedback
+                    ? feedback.correct && index === feedback.correctIndex
+                      ? 'bg-green-100 border-green-500'
+                      : index === selectedAnswer && !feedback.correct
+                      ? 'bg-red-100 border-red-500'
+                      : feedback.correctIndex === index
+                      ? 'bg-green-100 border-green-500'
+                      : 'bg-gray-100 border-gray-300'
+                    : 'bg-blue-100 border-blue-500'
+                  : feedback && feedback.correctIndex === index
+                  ? 'bg-green-100 border-green-500'
+                  : 'bg-white border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <span className="font-medium mr-2">
+                {String.fromCharCode(65 + index)}.
+              </span>
+              {option}
             </button>
+          ))}
+        </div>
+
+        {feedback && (
+          <div className={`p-4 rounded-lg mb-6 ${
+            feedback.correct ? 'bg-green-100' : 'bg-red-100'
+          }`}>
+            <p className="font-semibold">
+              {feedback.correct ? '✅ Correct!' : '❌ Incorrect'}
+            </p>
+            <p className="mt-2">
+              <strong>Answer:</strong> {feedback.correctLetter}
+            </p>
+            <p className="mt-1">{feedback.explanation}</p>
           </div>
         )}
-      </main>
+
+        <div className="flex justify-between">
+          {!feedback ? (
+            <button
+              onClick={handleAnswerSubmit}
+              disabled={selectedAnswer === null}
+              className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:bg-gray-300"
+            >
+              Submit Answer
+            </button>
+          ) : (
+            <button
+              onClick={handleNext}
+              className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+            >
+              {current < quiz.length - 1 ? 'Next Question' : 'Finish Quiz'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-2">Quiz Generator</h1>
+      <p className="text-gray-600 mb-6">
+        Upload study materials and generate personalized quizzes using AI
+      </p>
+
+      <form onSubmit={handleGenerate} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Upload File (PDF or Text)
+          </label>
+          <input
+            type="file"
+            accept=".pdf,.txt"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Number of Questions
+          </label>
+          <select
+            value={numQ}
+            onChange={(e) => setNumQ(Number(e.target.value))}
+            className="w-full p-2 border rounded"
+          >
+            <option value={3}>3 questions</option>
+            <option value={5}>5 questions</option>
+            <option value={10}>10 questions</option>
+            <option value={15}>15 questions</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Difficulty</label>
+          <select
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value)}
+            className="w-full p-2 border rounded"
+          >
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !file}
+          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 disabled:bg-gray-300"
+        >
+          {loading ? 'Generating Quiz...' : 'Generate Quiz'}
+        </button>
+      </form>
+
+      {error && (
+        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {error}
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default QuizGenerator;

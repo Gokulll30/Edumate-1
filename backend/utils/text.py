@@ -1,16 +1,17 @@
-from typing import IO
+import io
 
-def read_txt(file_stream: IO[bytes]) -> str:
-    data = file_stream.read()
+def read_txt(stream: io.BytesIO) -> str:
+    """Read text from stream"""
     try:
-        return data.decode("utf-8", errors="ignore")
-    except Exception:
-        return data.decode("latin-1", errors="ignore")
+        stream.seek(0)
+        content = stream.read()
+        return content.decode('utf-8').strip()
+    except Exception as e:
+        raise Exception(f"Error reading text file: {str(e)}")
 
-def clamp(s: str, limit: int = 12000) -> str:
-    if not s:
-        return s
-    s = s.strip()
-    if len(s) <= limit:
-        return s
-    return s[:limit]
+def clamp(text: str, limit: int = 12000) -> str:
+    """Limit text length"""
+    if not text:
+        return text
+    text = text.strip()
+    return text[:limit] if len(text) > limit else text

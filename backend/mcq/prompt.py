@@ -1,17 +1,17 @@
 MCQ_SCHEMA = {
-  "type": "ARRAY",
-  "items": {
-    "type": "OBJECT",
-    "required": ["question", "options", "answer", "explanation", "difficulty", "topic"],
-    "properties": {
-      "question": {"type": "STRING"},
-      "options":  {"type": "ARRAY", "items": {"type": "STRING"}},
-      "answer":   {"type": "STRING", "description": "One of A/B/C/D"},
-      "explanation": {"type": "STRING"},
-      "difficulty": {"type": "STRING", "description": "easy|medium|hard|mixed"},
-      "topic": {"type": "STRING"}
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": ["question", "options", "answer", "explanation", "difficulty", "topic"],
+        "properties": {
+            "question": {"type": "string"},
+            "options": {"type": "array", "items": {"type": "string"}},
+            "answer": {"type": "string", "enum": ["A", "B", "C", "D"]},
+            "explanation": {"type": "string"},
+            "difficulty": {"type": "string", "enum": ["easy", "medium", "hard", "mixed"]},
+            "topic": {"type": "string"}
+        }
     }
-  }
 }
 
 def build_mcq_prompt(notes: str, num_q: int = 5, difficulty: str = "mixed") -> str:
