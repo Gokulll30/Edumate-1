@@ -1,11 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-
-// IMPORTANT: import the function implementation directly to avoid the package's CLI/sample path
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import * as pdfParseMod from 'pdf-parse/lib/pdf-parse.js';
-const pdfParse = (pdfParseMod as any).default || (pdfParseMod as any);
+// Use the legacy ESM build that works in Node/serverless
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 // JSON schema for Gemini JSON mode
 const MCQ_SCHEMA = {
@@ -62,6 +58,25 @@ function normalize(items: any[]) {
   });
 }
 
+// Extract plain text from a PDF Buffer using pdfjs-dist
+async function extractTextWithPdfjs(buffer: Buffer, pageLimit = 50): Promise<string> {
+  // pdfjs expects Uint8Array
+  const data = new Uint8Array(buffer);
+
+  // Use the legacy build's getDocument; no worker needed in Node for this build
+  const loadingTask = pdfjsLib.getDocument({ data });
+  const doc = await loadingTask.promise;
+
+  let out = '';
+  const maxPages = Math.min(doc.numPages, pageLimit);
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    out += content.items.map((it: any) => it.str).join(' ') + '\n';
+  }
+  return out;
+}
+
 // Disable default body parsing so we can stream multipart
 export const config = { api: { bodyParser: false } };
 
@@ -109,9 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let text = '';
     if (isPdf) {
-      // Use direct function import; parse from Buffer only (no filesystem)
-      const parsed = await (pdfParse as any)(buf);
-      text = parsed?.text || '';
+      text = await extractTextWithPdfjs(buf);
     } else if (lower.endsWith('.txt')) {
       text = buf.toString('utf-8');
     } else {
@@ -143,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
-    const raw = result.response.text();
+    const raw = result.response.text(); // strict JSON string
     const items = JSON.parse(raw);
     const quiz = normalize(items);
 
