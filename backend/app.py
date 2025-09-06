@@ -22,11 +22,17 @@ genai.configure(api_key=GEMINI_API_KEY)
 app = Flask(__name__)
 
 # CORS for frontend
-CORS(app, origins=[
-    "http://localhost:3000",  # React dev server
-    "http://localhost:5173",  # Vite dev server
-    "https://*.vercel.app",   # All Vercel deployments
-])
+CORS(app, 
+     origins=[
+         "http://localhost:3000",
+         "http://localhost:5173", 
+         "https://*.vercel.app",
+         "https://your-frontend-domain.vercel.app"  # Replace with your actual Vercel domain
+     ],
+     methods=["GET", "POST", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization"],
+     supports_credentials=True
+)
 
 @app.route("/health", methods=["GET"])
 def health_check():
@@ -105,6 +111,18 @@ def check_answer():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "*")
+        response.headers.add('Access-Control-Allow-Methods', "*")
+        return response
+
+# Don't forget to import make_response
+from flask import Flask, request, jsonify, make_response
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
