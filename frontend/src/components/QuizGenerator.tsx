@@ -76,7 +76,7 @@ export default function QuizGenerator() {
             <input
               type="file"
               accept=".pdf,.txt"
-              onChange={(e) => setFile(e.target.files?. || null)}
+              onChange={(e) => setFile(e.target.files && e.target.files ? e.target.files : null)}
               className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2"
             />
             <select
