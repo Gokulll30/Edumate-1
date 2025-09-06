@@ -1,4 +1,3 @@
-// frontend/api/quiz/upload.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import pdfParse from 'pdf-parse';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -12,7 +11,7 @@ const MCQ_SCHEMA = {
     properties: {
       question: { type: 'string' },
       options: { type: 'array', items: { type: 'string' } },
-      answer: { type: 'string', description: 'One of A,B, C, D' },
+      answer: { type: 'string', description: 'One of A,B,C,D' },
       explanation: { type: 'string' },
       difficulty: { type: 'string' },
       topic: { type: 'string' },
@@ -28,49 +27,37 @@ function clamp(s: string, limit = 12000) {
 
 function buildPrompt(notes: string, num_q: number, difficulty: string) {
   return `
-You are an expert educational content creator.
-
 Create exactly ${num_q} multiple-choice questions from the notes below.
-
 Rules:
-- Each MCQ must have exactly 4 options labeled A, B, C, D in an "options" array.
-- "answer" must be exactly one of "A","B","C","D".
-- Provide a one-sentence "explanation" for why the answer is correct.
-- Include "topic" and "difficulty" for each question.
-- Avoid ambiguity; base questions strictly on the provided notes.
-
-Return ONLY JSON that conforms to the schema (already included in the request).
-
+- Exactly 4 options in "options" labeled A-D.
+- "answer" is one of A,B,C,D only.
+- Provide a one-sentence "explanation".
+- Include "topic" and "difficulty".
+Return ONLY JSON matching the provided schema.
 Notes:
-"""${notes}"""
-`;
+"""${notes}"""`;
 }
 
 function normalize(items: any[]) {
-  const out = [];
-  for (const item of items) {
-    const options = (item.options || []).map((x: any) => String(x)).slice(0, 4);
-    while (options.length < 4) options.push('N/A');
-    const letter = String(item.answer || 'A').trim().toUpperCase();
+  return (items || []).map((item: any) => {
+    const opts = (item.options || []).map((x: any) => String(x)).slice(0, 4);
+    while (opts.length < 4) opts.push('N/A');
     const map: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+    const letter = String(item.answer || 'A').trim().toUpperCase();
     const idx = map[letter] ?? 0;
-
-    out.push({
+    return {
       question: String(item.question || '').trim(),
-      options,
+      options: opts,
       answerIndex: idx,
       answerLetter: 'ABCD'[idx],
       explanation: String(item.explanation || '').trim(),
       difficulty: String(item.difficulty || 'mixed').trim(),
       topic: String(item.topic || 'General').trim(),
-    });
-  }
-  return out;
+    };
+  });
 }
 
-export const config = {
-  api: { bodyParser: false }, // We will parse multipart stream manually
-};
+export const config = { api: { bodyParser: false } };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -82,31 +69,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const Busboy = (await import('busboy')).default;
     const bb = Busboy({ headers: req.headers });
 
-    const fileBuffers: Buffer[] = [];
+    const fileParts: Buffer[] = [];
     let fileName = '';
     const fields: Record<string, string> = {};
 
     await new Promise<void>((resolve, reject) => {
       bb.on('file', (_name, file, info) => {
         fileName = info.filename || '';
-        file.on('data', (d: Buffer) => fileBuffers.push(d));
+        file.on('data', (d: Buffer) => fileParts.push(d));
         file.on('end', () => {});
       });
-      bb.on('field', (name, val) => {
-        fields[name] = val;
+      bb.on('field', (n, v) => {
+        fields[n] = v;
       });
+      bb.on('close', resolve);
       bb.on('error', reject);
-      bb.on('close', () => resolve());
       // @ts-ignore
       req.pipe(bb);
     });
 
-    if (fileBuffers.length === 0) {
+    if (!fileParts.length) {
       return res.status(400).json({ success: false, error: 'file field is required' });
     }
 
-    const buf = Buffer.concat(fileBuffers);
-    const lower = fileName.toLowerCase();
+    const buf = Buffer.concat(fileParts);
+    const lower = (fileName || '').toLowerCase();
     let text = '';
     if (lower.endsWith('.pdf')) {
       const parsed = await pdfParse(buf);
@@ -119,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     text = clamp(text, 12000);
     if (!text || text.length < 50) {
-      return res.status(400).json({ success: false, error: 'File has insufficient text' });
+      return res.status(400).json({ success: false, error: 'Insufficient text' });
     }
 
     const num_q = parseInt(fields['num_q'] || '5', 10);
@@ -137,11 +124,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
-    const raw = result.response.text(); // strict JSON string
+    const raw = result.response.text();
     const items = JSON.parse(raw);
-    const quiz = normalize(items);
-
-    return res.status(200).json({ success: true, quiz });
+    return res.status(200).json({ success: true, quiz: normalize(items) });
   } catch (e: any) {
     return res.status(500).json({ success: false, error: e?.message || String(e) });
   }
