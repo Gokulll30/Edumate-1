@@ -13,7 +13,9 @@ function AppContent() {
   const { user } = useAuth();
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-900 to-slate-950 text-white">
+    <aside className="w-64 shrink-0"><Navigation /></aside>
+    <main className="flex-1 overflow-auto p-6 md:p-10">
       <Routes>
         <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
         <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/" />} />
