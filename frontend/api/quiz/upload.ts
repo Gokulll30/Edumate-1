@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pdfParse from 'pdf-parse';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // JSON schema for Gemini JSON mode
@@ -57,6 +56,7 @@ function normalize(items: any[]) {
   });
 }
 
+// Important: disable default body parsing so we can stream multipart
 export const config = { api: { bodyParser: false } };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -66,6 +66,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!key) return res.status(500).json({ success: false, error: 'GEMINI_API_KEY not set' });
 
   try {
+    console.log('upload: start');
+
     const Busboy = (await import('busboy')).default;
     const bb = Busboy({ headers: req.headers });
 
@@ -76,6 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await new Promise<void>((resolve, reject) => {
       bb.on('file', (_name, file, info) => {
         fileName = info.filename || '';
+        console.log('upload: got-file', fileName);
         file.on('data', (d: Buffer) => fileParts.push(d));
         file.on('end', () => {});
       });
@@ -93,16 +96,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const buf = Buffer.concat(fileParts);
+    console.log('upload: size', buf.length);
+
     const lower = (fileName || '').toLowerCase();
+    const isPdf = lower.endsWith('.pdf') || buf.slice(0, 5).toString() === '%PDF-';
+
     let text = '';
-    if (lower.endsWith('.pdf')) {
+    if (isPdf) {
+      // Dynamic import to always use the Buffer API (avoids demo/CLI path)
+      const { default: pdfParse } = await import('pdf-parse');
       const parsed = await pdfParse(buf);
       text = parsed.text || '';
     } else if (lower.endsWith('.txt')) {
       text = buf.toString('utf-8');
     } else {
-      return res.status(400).json({ success: false, error: 'Only PDF or TXT supported' });
+      // Fallback: try UTF-8 as text
+      text = buf.toString('utf-8');
     }
+
+    console.log('upload: text-len', text.length);
 
     text = clamp(text, 12000);
     if (!text || text.length < 50) {
@@ -111,6 +123,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const num_q = parseInt(fields['num_q'] || '5', 10);
     const difficulty = fields['difficulty'] || 'mixed';
+
+    console.log('upload: gen', num_q, difficulty);
 
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -124,10 +138,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
-    const raw = result.response.text();
+    const raw = result.response.text(); // strict JSON string
     const items = JSON.parse(raw);
-    return res.status(200).json({ success: true, quiz: normalize(items) });
+    const quiz = normalize(items);
+
+    console.log('upload: done');
+
+    return res.status(200).json({ success: true, quiz });
   } catch (e: any) {
+    console.error('upload: error', e?.message || e);
     return res.status(500).json({ success: false, error: e?.message || String(e) });
   }
 }
