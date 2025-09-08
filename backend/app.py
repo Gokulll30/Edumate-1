@@ -67,7 +67,7 @@ def generate_quiz():
 
         text = clamp(text, 12000)
         if not text or len(text) < 50:
-            return jsonify({"success": False, "error": "File has insufficient text to create a quiz"}), 400
+            return jsonify({"success": False, "error": "File has insufficient texts to create a quiz"}), 400
 
         num_q = int(request.form.get("num_q", 5))
         difficulty = request.form.get("difficulty", "mixed")
