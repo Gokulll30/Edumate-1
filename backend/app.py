@@ -10,6 +10,13 @@ from utils.text import read_txt, clamp
 from mcq.prompt import MCQ_SCHEMA, build_mcq_prompt
 from mcq.parser import normalize_mcqs
 
+# 👇 new import for chat blueprint
+from chat.routes import chat_bp
+import docx2txt
+import PyPDF2
+
+
+
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -32,6 +39,9 @@ CORS(app,
      allow_headers=["Content-Type"],
      supports_credentials=False
 )
+
+# ✅ register chat blueprint here
+app.register_blueprint(chat_bp, url_prefix="/chat")
 
 @app.before_request
 def handle_preflight():
@@ -67,7 +77,7 @@ def generate_quiz():
 
         text = clamp(text, 12000)
         if not text or len(text) < 50:
-            return jsonify({"success": False, "error": "File has insufficient text to create a quiz"}), 400
+            return jsonify({"success": False, "error": "File has insufficient texts to create a quiz"}), 400
 
         num_q = int(request.form.get("num_q", 5))
         difficulty = request.form.get("difficulty", "mixed")
@@ -116,6 +126,41 @@ def check_answer():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file part"}), 400
+
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        filename = file.filename.lower()
+        content = ""
+        stream = io.BytesIO(file.read())
+
+        # Extract text depending on file type
+        if filename.endswith(".txt"):
+            content = stream.read().decode("utf-8")
+        elif filename.endswith(".pdf"):
+            pdf_reader = PyPDF2.PdfReader(stream)
+            content = "\n".join(page.extract_text() for page in pdf_reader.pages)
+        elif filename.endswith(".docx"):
+            content = docx2txt.process(stream)
+        else:
+            return jsonify({"error": "Only PDF, DOCX, and TXT files are supported"}), 400
+
+        if not content.strip():
+            return jsonify({"error": "File is empty or unreadable"}), 400
+
+        return jsonify({"content": content})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))

@@ -21,6 +21,7 @@ export default function ChatInterface() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [typingContent, setTypingContent] = useState(""); // for animation
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,43 +31,69 @@ export default function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, typingContent]);
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
+  // Animate bot reply line by line
+  const animateBotReply = (fullText: string) => {
+    const lines = fullText.split("\n"); // split by newline
+    let i = 0;
+    setTypingContent("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "Great question! Based on your study materials, I recommend breaking this topic into smaller sections. Would you like me to create a study schedule for you?",
-        "I can help you with that! Let me analyze your uploaded documents and create a custom quiz. This will help reinforce the key concepts.",
-        "That's an excellent topic to focus on! I notice you've been studying this area for a while. Let me suggest some active recall techniques that could help improve your retention.",
-        "Perfect! I can see from your progress that you're doing well in this subject. Would you like me to generate some practice questions to test your understanding?",
-        "I understand you're preparing for your exam. Let me create a personalized study plan based on your learning style and available time. When is your exam scheduled?"
-      ];
-
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'bot',
-        content: responses[Math.floor(Math.random() * responses.length)],
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, botMessage]);
-      setIsTyping(false);
-    }, 1500);
+    const interval = setInterval(() => {
+      setTypingContent(prev => prev + (i > 0 ? "\n" : "") + lines[i]);
+      i++;
+      if (i >= lines.length) {
+        clearInterval(interval);
+        const botMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'bot',
+          content: fullText,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, botMessage]);
+        setTypingContent("");
+        setIsTyping(false);
+      }
+    }, 300); // adjust speed if needed
   };
+
+  const handleSendMessage = async () => {
+  if (!inputValue.trim()) return;
+
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    type: 'user',
+    content: inputValue,
+    timestamp: new Date()
+  };
+
+  setMessages(prev => [...prev, userMessage]);
+  setInputValue('');
+  setIsTyping(true);
+
+  try {
+    // Call your backend
+    const res = await fetch("http://127.0.0.1:5001/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: userMessage.content })
+    });
+    const data = await res.json();
+    let botReply = data.reply || "";
+
+    // Remove all asterisks
+    botReply = botReply.replace(/\*/g, "");
+
+    // Animate instead of instantly showing
+    animateBotReply(botReply);
+
+  } catch (error) {
+    console.error(error);
+    setIsTyping(false);
+  }
+};
+
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -74,6 +101,44 @@ export default function ChatInterface() {
       handleSendMessage();
     }
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    // Send file to backend
+    const res = await fetch("http://127.0.0.1:5001/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    const fileContent = data.content || "";
+
+    // Add extracted content as a user message
+    const fileMessage: Message = {
+      id: Date.now().toString(),
+      type: "user",
+      content: fileContent,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, fileMessage]);
+
+    // Optionally, send this content to LLaMA automatically
+    setInputValue(fileContent);
+    handleSendMessage();
+
+  } catch (error) {
+    console.error("File upload error:", error);
+  }
+
+  // Clear file input
+  e.target.value = '';
+};
+
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
@@ -113,44 +178,29 @@ export default function ChatInterface() {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex items-start space-x-3 ${
-                message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-              }`}
+              className={`flex items-start space-x-3 ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                message.type === 'user' 
-                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500' 
-                  : 'bg-gradient-to-r from-purple-500 to-pink-500'
-              }`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${message.type === 'user' ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}>
                 {message.type === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
               </div>
               
               <div className={`max-w-3xl ${message.type === 'user' ? 'text-right' : ''}`}>
-                <div className={`inline-block p-4 rounded-2xl ${
-                  message.type === 'user'
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white'
-                    : 'bg-slate-800/50 border border-slate-700/50 text-white'
-                }`}>
+                <div className={`inline-block p-4 rounded-2xl ${message.type === 'user' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' : 'bg-slate-800/50 border border-slate-700/50 text-white'}`}>
                   <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                 </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  {formatTime(message.timestamp)}
-                </p>
+                <p className="text-xs text-slate-500 mt-2">{formatTime(message.timestamp)}</p>
               </div>
             </div>
           ))}
-          
-          {isTyping && (
+
+          {/* Animated typing reply */}
+          {typingContent && (
             <div className="flex items-start space-x-3">
               <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                 <Bot className="w-5 h-5 text-white" />
               </div>
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                </div>
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 text-white">
+                <p className="whitespace-pre-wrap">{typingContent}</p>
               </div>
             </div>
           )}
@@ -179,13 +229,14 @@ export default function ChatInterface() {
 
         {/* Input Area */}
         <div className="bg-slate-900/50 backdrop-blur-sm border-t border-slate-700/50 p-6">
-          <div className="flex items-end space-x-3">
+          <div className="flex items-center space-x-3">
             <input
               type="file"
               ref={fileInputRef}
               className="hidden"
               multiple
               accept=".pdf,.doc,.docx,.txt"
+              onChange={handleFileUpload}
             />
             
             <button
