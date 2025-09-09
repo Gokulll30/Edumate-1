@@ -74,7 +74,7 @@ export default function ChatInterface() {
 
   try {
     // Call your backend
-    const res = await fetch("http://127.0.0.1:5001/chat", {
+    const res = await fetch("https://edumate-1-mgnm.onrender.com/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: userMessage.content })
@@ -111,7 +111,7 @@ export default function ChatInterface() {
 
   try {
     // Send file to backend
-    const res = await fetch("http://127.0.0.1:5001/upload", {
+    const res = await fetch("https://edumate-1-mgnm.onrender.com/upload", {
       method: "POST",
       body: formData,
     });
