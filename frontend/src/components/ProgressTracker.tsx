@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Navigation from './Navigation';
-import { TrendingUp, Target, Award, Clock, BookOpen, Brain, Calendar, BarChart3 } from 'lucide-react';
+import { TrendingUp, Target, Award, Clock, BookOpen, Brain } from 'lucide-react';
 
 interface Subject {
   name: string;
@@ -22,64 +22,81 @@ interface Achievement {
 
 export default function ProgressTracker() {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
-  
-  const subjects: Subject[] = [
-    { name: 'Computer Science', progress: 78, totalHours: 24.5, completedSessions: 18, averageScore: 87, color: 'purple' },
-    { name: 'Mathematics', progress: 65, totalHours: 18.2, completedSessions: 14, averageScore: 82, color: 'blue' },
-    { name: 'Database Systems', progress: 92, totalHours: 16.8, completedSessions: 12, averageScore: 94, color: 'green' },
-    { name: 'Machine Learning', progress: 45, totalHours: 12.3, completedSessions: 8, averageScore: 76, color: 'orange' }
-  ];
 
-  const achievements: Achievement[] = [
-    {
-      id: '1',
-      title: 'Study Streak Master',
-      description: 'Study for 7 consecutive days',
-      icon: Award,
-      completed: true,
-      completedDate: '2025-01-10'
-    },
-    {
-      id: '2',
-      title: 'Quiz Champion',
-      description: 'Score above 90% in 5 quizzes',
-      icon: Target,
-      completed: true,
-      completedDate: '2025-01-08'
-    },
-    {
-      id: '3',
-      title: 'Time Master',
-      description: 'Study for 50+ hours this month',
-      icon: Clock,
-      completed: false
-    },
-    {
-      id: '4',
-      title: 'Knowledge Seeker',
-      description: 'Complete 100 study sessions',
-      icon: BookOpen,
-      completed: false
-    },
-    {
-      id: '5',
-      title: 'AI Assistant Pro',
-      description: 'Use AI chat for 30+ conversations',
-      icon: Brain,
-      completed: true,
-      completedDate: '2025-01-12'
-    }
-  ];
+  // Change to: fetch/check user progress for real logic
+  const userHasData = false; // <--- set to false to show new-user state
 
-  const weeklyData = [
-    { day: 'Mon', hours: 3.5, score: 85 },
-    { day: 'Tue', hours: 2.8, score: 92 },
-    { day: 'Wed', hours: 4.2, score: 78 },
-    { day: 'Thu', hours: 3.1, score: 88 },
-    { day: 'Fri', hours: 2.5, score: 91 },
-    { day: 'Sat', hours: 5.2, score: 83 },
-    { day: 'Sun', hours: 3.8, score: 89 }
-  ];
+  const subjects: Subject[] = userHasData
+    ? [
+        { name: 'Computer Science', progress: 78, totalHours: 24.5, completedSessions: 18, averageScore: 87, color: 'purple' },
+        { name: 'Mathematics', progress: 65, totalHours: 18.2, completedSessions: 14, averageScore: 82, color: 'blue' },
+        { name: 'Database Systems', progress: 92, totalHours: 16.8, completedSessions: 12, averageScore: 94, color: 'green' },
+        { name: 'Machine Learning', progress: 45, totalHours: 12.3, completedSessions: 8, averageScore: 76, color: 'orange' }
+      ]
+    : [];
+
+  const achievements: Achievement[] = userHasData
+    ? [
+        {
+          id: '1',
+          title: 'Study Streak Master',
+          description: 'Study for 7 consecutive days',
+          icon: Award,
+          completed: true,
+          completedDate: '2025-01-10'
+        },
+        {
+          id: '2',
+          title: 'Quiz Champion',
+          description: 'Score above 90% in 5 quizzes',
+          icon: Target,
+          completed: true,
+          completedDate: '2025-01-08'
+        },
+        {
+          id: '3',
+          title: 'Time Master',
+          description: 'Study for 50+ hours this month',
+          icon: Clock,
+          completed: false
+        },
+        {
+          id: '4',
+          title: 'Knowledge Seeker',
+          description: 'Complete 100 study sessions',
+          icon: BookOpen,
+          completed: false
+        },
+        {
+          id: '5',
+          title: 'AI Assistant Pro',
+          description: 'Use AI chat for 30+ conversations',
+          icon: Brain,
+          completed: true,
+          completedDate: '2025-01-12'
+        }
+      ]
+    : [];
+
+  const weeklyData = userHasData
+    ? [
+        { day: 'Mon', hours: 3.5, score: 85 },
+        { day: 'Tue', hours: 2.8, score: 92 },
+        { day: 'Wed', hours: 4.2, score: 78 },
+        { day: 'Thu', hours: 3.1, score: 88 },
+        { day: 'Fri', hours: 2.5, score: 91 },
+        { day: 'Sat', hours: 5.2, score: 83 },
+        { day: 'Sun', hours: 3.8, score: 89 }
+      ]
+    : [
+        { day: 'Mon', hours: 0, score: 0 },
+        { day: 'Tue', hours: 0, score: 0 },
+        { day: 'Wed', hours: 0, score: 0 },
+        { day: 'Thu', hours: 0, score: 0 },
+        { day: 'Fri', hours: 0, score: 0 },
+        { day: 'Sat', hours: 0, score: 0 },
+        { day: 'Sun', hours: 0, score: 0 }
+      ];
 
   const getSubjectColor = (color: string) => {
     const colors = {
@@ -101,17 +118,24 @@ export default function ProgressTracker() {
     return colors[color as keyof typeof colors];
   };
 
-  const overallStats = {
-    totalHours: subjects.reduce((acc, s) => acc + s.totalHours, 0),
-    averageScore: Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length),
-    completedAchievements: achievements.filter(a => a.completed).length,
-    studyStreak: 12
-  };
+  const overallStats = userHasData && subjects.length
+    ? {
+        totalHours: subjects.reduce((acc, s) => acc + s.totalHours, 0),
+        averageScore: Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length),
+        completedAchievements: achievements.filter(a => a.completed).length,
+        studyStreak: 12
+      }
+    : {
+        totalHours: 0,
+        averageScore: "—",
+        completedAchievements: 0,
+        studyStreak: "—"
+      };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gray-900">
       <Navigation />
-      
+
       <main className="ml-64 p-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
@@ -119,7 +143,7 @@ export default function ProgressTracker() {
             <h1 className="text-3xl font-bold text-white mb-2">Progress Tracker</h1>
             <p className="text-slate-400">Monitor your learning journey and achievements</p>
           </div>
-          <select 
+          <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
             className="bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-600 focus:outline-none focus:border-purple-500"
@@ -132,75 +156,75 @@ export default function ProgressTracker() {
 
         {/* Overall Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Clock className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{overallStats.totalHours.toFixed(1)}h</p>
-                <p className="text-slate-400 text-sm">Total Hours</p>
-              </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mr-4">
+              <Clock className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {userHasData && overallStats.totalHours ? `${overallStats.totalHours.toFixed(1)}h` : `0h`}
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Total Hours</p>
             </div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Target className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{overallStats.averageScore}%</p>
-                <p className="text-slate-400 text-sm">Average Score</p>
-              </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mr-4">
+              <Target className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {userHasData && overallStats.averageScore !== "—" ? `${overallStats.averageScore}%` : "—"}
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Average Score</p>
             </div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <Award className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{overallStats.completedAchievements}/{achievements.length}</p>
-                <p className="text-slate-400 text-sm">Achievements</p>
-              </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center mr-4">
+              <Award className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {userHasData ? `${overallStats.completedAchievements}/${achievements.length}` : "0/0"}
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Achievements</p>
             </div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{overallStats.studyStreak}</p>
-                <p className="text-slate-400 text-sm">Day Streak</p>
-              </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mr-4">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {userHasData && overallStats.studyStreak !== "—" ? overallStats.studyStreak : "—"}
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Day Streak</p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Weekly Activity Chart */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-6">Weekly Activity</h3>
             <div className="space-y-4">
               {weeklyData.map((day, index) => (
                 <div key={day.day} className="flex items-center space-x-4">
                   <span className="text-slate-400 text-sm w-8">{day.day}</span>
-                  <div className="flex-1 flex items-center space-x-3">
+                  <div className="flex flex-1 items-center gap-3">
                     <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${(day.hours / 6) * 100}%` }}
+                        style={{ width: userHasData ? `${(day.hours / 6) * 100}%` : '0%' }}
                       />
                     </div>
-                    <span className="text-white text-sm w-12">{day.hours}h</span>
+                    <span className="text-white text-sm w-10">{userHasData ? `${day.hours}h` : `0h`}</span>
                     <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${day.score}%` }}
+                        style={{ width: userHasData ? `${day.score}%` : '0%' }}
                       />
                     </div>
-                    <span className="text-white text-sm w-12">{day.score}%</span>
+                    <span className="text-white text-sm w-10">{userHasData ? `${day.score}%` : `—`}</span>
                   </div>
                 </div>
               ))}
@@ -218,49 +242,48 @@ export default function ProgressTracker() {
           </div>
 
           {/* Achievements */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-6">Achievements</h3>
             <div className="space-y-4">
+              {(!achievements || achievements.length === 0) && (
+                <div className="text-slate-500 py-8 text-center">No achievements yet.</div>
+              )}
               {achievements.map((achievement) => {
                 const Icon = achievement.icon;
                 return (
-                  <div 
+                  <div
                     key={achievement.id}
-                    className={`p-4 rounded-lg border transition-all duration-300 ${
-                      achievement.completed 
-                        ? 'bg-green-500/10 border-green-500/30' 
+                    className={`p-4 rounded-lg border flex items-center space-x-4 transition-all duration-300 ${
+                      achievement.completed
+                        ? 'bg-green-500/10 border-green-500/30'
                         : 'bg-slate-700/30 border-slate-600/50'
                     }`}
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                        achievement.completed 
-                          ? 'bg-green-500' 
-                          : 'bg-slate-600'
-                      }`}>
-                        <Icon className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className={`font-semibold ${
-                          achievement.completed ? 'text-white' : 'text-slate-300'
-                        }`}>
-                          {achievement.title}
-                        </h4>
-                        <p className="text-slate-400 text-sm">{achievement.description}</p>
-                        {achievement.completedDate && (
-                          <p className="text-green-400 text-xs mt-1">
-                            Completed on {new Date(achievement.completedDate).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      {achievement.completed && (
-                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </div>
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                      achievement.completed
+                        ? 'bg-green-500'
+                        : 'bg-slate-600'
+                    }`}>
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className={`font-semibold ${achievement.completed ? 'text-white' : 'text-slate-300'}`}>
+                        {achievement.title}
+                      </h4>
+                      <p className="text-slate-400 text-sm">{achievement.description}</p>
+                      {achievement.completed && achievement.completedDate && (
+                        <p className="text-green-400 text-xs mt-1">
+                          Completed on {new Date(achievement.completedDate).toLocaleDateString()}
+                        </p>
                       )}
                     </div>
+                    {achievement.completed && (
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -269,11 +292,14 @@ export default function ProgressTracker() {
         </div>
 
         {/* Subject Progress */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <h3 className="text-xl font-semibold text-white mb-6">Subject Progress</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {subjects.length === 0 && (
+              <div className="col-span-2 text-slate-500 p-8 text-center">No subject progress yet.</div>
+            )}
             {subjects.map((subject, index) => (
-              <div 
+              <div
                 key={index}
                 className={`p-6 rounded-xl border ${getSubjectBgColor(subject.color)}`}
               >
@@ -281,20 +307,18 @@ export default function ProgressTracker() {
                   <h4 className="text-white font-semibold">{subject.name}</h4>
                   <span className="text-white font-bold">{subject.progress}%</span>
                 </div>
-                
                 <div className="mb-4">
                   <div className="flex justify-between text-sm text-slate-400 mb-2">
                     <span>Progress</span>
                     <span>{subject.progress}%</span>
                   </div>
                   <div className="bg-slate-700 rounded-full h-2 overflow-hidden">
-                    <div 
+                    <div
                       className={`${getSubjectColor(subject.color)} h-2 rounded-full transition-all duration-500`}
                       style={{ width: `${subject.progress}%` }}
                     />
                   </div>
                 </div>
-                
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-white font-semibold">{subject.totalHours}h</p>

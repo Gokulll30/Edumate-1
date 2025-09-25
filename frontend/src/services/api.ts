@@ -22,7 +22,6 @@ export type AnswerCheckResponse = {
   error?: string;
 };
 
-// Use environment variable for API base URL
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 export async function uploadNotesForQuiz(
@@ -36,8 +35,9 @@ export async function uploadNotesForQuiz(
   formData.append("difficulty", difficulty);
 
   try {
-    const response = await fetch(`${API_BASE}/quiz`, {  // Simplified endpoint
+    const response = await fetch(`${API_BASE}/quiz/upload`, { // Corrected endpoint
       method: "POST",
+      // No Content-Type header here, let the browser set it for FormData
       body: formData,
     });
 
@@ -45,7 +45,6 @@ export async function uploadNotesForQuiz(
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
     }
-
     return await response.json();
   } catch (error) {
     console.error("Quiz generation error:", error);
@@ -59,17 +58,15 @@ export async function checkAnswer(
   selectedIndex: number
 ): Promise<AnswerCheckResponse> {
   try {
-    const response = await fetch(`${API_BASE}/check`, {  // Simplified endpoint
+    const response = await fetch(`${API_BASE}/quiz/check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ quiz, questionIndex, selectedIndex }),
     });
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
     }
-
     return await response.json();
   } catch (error) {
     console.error("Answer check error:", error);

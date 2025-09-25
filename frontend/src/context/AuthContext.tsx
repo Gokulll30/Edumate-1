@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 interface User {
   id: string;
-  name: string;
+  name?: string;
   email: string;
   avatar?: string;
   studyGoals?: string[];
@@ -11,12 +11,14 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<any>;
+  signup: (name: string, email: string, password: string) => Promise<any>;
   logout: () => void;
   showAuthModal: boolean;
-  setShowAuthModal: (show: boolean) => void;
+  setShowAuthModal: React.Dispatch<React.SetStateAction<boolean>>;
 }
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -24,47 +26,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('edumate_user');
+      if (raw) setUser(JSON.parse(raw));
+    } catch {
+      // ignore parse error
+    }
+  }, []);
+
   const login = async (email: string, password: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser({
-      id: '1',
-      name: 'Alex Johnson',
-      email,
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
-      studyGoals: ['Computer Science Degree', 'Software Engineering Internship'],
-      learningStyle: 'Visual Learner'
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
-    setShowAuthModal(false);
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('Server returned non-JSON response');
+    }
+    const data = await res.json();
+    if (!res.ok) {
+      const err = data?.error || 'login_failed';
+      throw new Error(err);
+    }
+    if (data?.success) {
+      const userObj: User = {
+        id: String(data.user.id),
+        name: data.user.name || '',
+        email: data.user.email || email,
+      };
+      setUser(userObj);
+      localStorage.setItem('edumate_user', JSON.stringify(userObj));
+      setShowAuthModal(false);
+    }
+    return data;
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser({
-      id: '1',
-      name,
-      email,
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
-      studyGoals: [],
-      learningStyle: 'Visual Learner'
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
     });
-    setShowAuthModal(false);
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('Server returned non-JSON response');
+    }
+    const data = await res.json();
+    if (!res.ok) {
+      const err = data?.error || 'signup_failed';
+      throw new Error(err);
+    }
+    if (data?.success) {
+      const userObj: User = {
+        id: String(data.user.id),
+        name: data.user.name || name,
+        email: data.user.email || email,
+      };
+      setUser(userObj);
+      localStorage.setItem('edumate_user', JSON.stringify(userObj));
+      setShowAuthModal(false);
+    }
+    return data;
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('edumate_user');
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      signup,
-      logout,
-      showAuthModal,
-      setShowAuthModal
-    }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, showAuthModal, setShowAuthModal }}>
       {children}
     </AuthContext.Provider>
   );
@@ -72,8 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

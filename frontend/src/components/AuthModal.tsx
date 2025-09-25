@@ -1,30 +1,36 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function AuthModal() {
   const { showAuthModal, setShowAuthModal, login, signup } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: ''
-  });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+    setErrorMsg('');
+
     try {
       if (isLogin) {
         await login(formData.email, formData.password);
+        setShowAuthModal(false);
+        navigate('/dashboard');
       } else {
         await signup(formData.name, formData.email, formData.password);
+        setShowAuthModal(false);
+        navigate('/dashboard');
       }
-    } catch (error) {
-      console.error('Auth error:', error);
+    } catch (err: any) {
+      console.error(err);
+      const msg = err?.message || 'Something went wrong';
+      setErrorMsg(msg);
     } finally {
       setIsLoading(false);
     }
@@ -33,7 +39,7 @@ export default function AuthModal() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
@@ -55,6 +61,8 @@ export default function AuthModal() {
             </button>
           </div>
 
+          {errorMsg && <p className="text-red-400 text-sm mb-4">{errorMsg}</p>}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="relative">
@@ -65,12 +73,12 @@ export default function AuthModal() {
                   placeholder="Full Name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
                   required={!isLogin}
                 />
               </div>
             )}
-            
+
             <div className="relative">
               <Mail className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
               <input
@@ -79,11 +87,11 @@ export default function AuthModal() {
                 placeholder="Email Address"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
                 required
               />
             </div>
-            
+
             <div className="relative">
               <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
               <input
@@ -92,7 +100,7 @@ export default function AuthModal() {
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full pl-12 pr-12 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                className="w-full pl-12 pr-12 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
                 required
               />
               <button
@@ -109,7 +117,7 @@ export default function AuthModal() {
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-[1.02] disabled:hover:scale-100"
             >
-              {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
+              {isLoading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
             </button>
           </form>
 
