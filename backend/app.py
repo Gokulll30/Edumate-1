@@ -1,167 +1,113 @@
 import os
-import io
-import json
-from flask import Flask, request, jsonify, make_response
+import sys
+from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 from dotenv import load_dotenv
-from google import genai  # New import
-from utils.pdf import read_pdf
-from utils.text import read_txt, clamp
-from mcq.prompt import MCQ_SCHEMA, build_mcq_prompt
-from mcq.parser import normalize_mcqs
-
-# 👇 new import for chat blueprint
-from chat.routes import chat_bp
-import docx2txt
-import PyPDF2
-
-
-
+from quiz.routes import quiz_bp
 load_dotenv()
+HERE = os.path.dirname(__file__)
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+try:
+    from auth.routes import auth_bp
+except Exception as e:
+    print("Failed to import auth.routes:", e)
+    auth_bp = None
+from study.routes import study_bp
+try:
+    from quiz.routes import quiz_bp
+except Exception as e:
+    print("Failed to import quiz.routes:", e)
+    quiz_bp = None
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY is not set")
+# Add these lines to import and register chat blueprint
+try:
+    from chat.routes import chat_bp
+except Exception as e:
+    print("Failed to import chat.routes:", e)
+    chat_bp = None
 
-# New SDK initialization
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-app = Flask(__name__)
-
-CORS(app, 
-     origins=[
-         "http://localhost:3000",
-         "http://localhost:5173", 
-         "https://*.vercel.app",
-         "https://edumate-2026.vercel.app"
-     ],
-     methods=["GET", "POST", "OPTIONS"],
-     allow_headers=["Content-Type"],
-     supports_credentials=False
-)
-
-# ✅ register chat blueprint here
-app.register_blueprint(chat_bp, url_prefix="/chat")
-
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = make_response()
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add('Access-Control-Allow-Headers', "Content-Type")
-        response.headers.add('Access-Control-Allow-Methods', "GET,POST,OPTIONS")
-        return response
-
-@app.route("/health", methods=["GET"])
-def health_check():
-    return jsonify({"status": "healthy", "service": "quiz-backend"})
-
-@app.route("/quiz", methods=["POST"])
-def generate_quiz():
-    try:
-        if "file" not in request.files:
-            return jsonify({"success": False, "error": "file field is required"}), 400
-
-        f = request.files["file"]
-        filename = f.filename or ""
-        ext = filename.lower().strip()
-        
-        stream = io.BytesIO(f.read())
-        
-        if ext.endswith(".pdf"):
-            text = read_pdf(stream)
-        elif ext.endswith(".txt"):
-            text = read_txt(stream)
-        else:
-            return jsonify({"success": False, "error": "Only PDF and TXT files are supported"}), 400
-
-        text = clamp(text, 12000)
-        if not text or len(text) < 50:
-            return jsonify({"success": False, "error": "File has insufficient texts to create a quiz"}), 400
-
-        num_q = int(request.form.get("num_q", 5))
-        difficulty = request.form.get("difficulty", "mixed")
-
-        prompt = build_mcq_prompt(text, num_q=num_q, difficulty=difficulty)
-        
-        # New SDK syntax - this is the fix!
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": MCQ_SCHEMA,
-            }
-        )
-
-        raw_json = response.text
-        data = json.loads(raw_json)
-        quiz = normalize_mcqs(data)
-
-        return jsonify({"success": True, "quiz": quiz})
-
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route("/check", methods=["POST"])
-def check_answer():
-    try:
-        payload = request.get_json(force=True)
-        quiz = payload["quiz"]
-        qi = int(payload["questionIndex"])
-        sel = int(payload["selectedIndex"])
-
-        item = quiz[qi]
-        corr_idx = int(item.get("answerIndex", 0))
-        corr_letter = item.get("answerLetter", "A")
-        explanation = item.get("explanation", "")
-
-        return jsonify({
-            "correct": sel == corr_idx,
-            "correctIndex": corr_idx,
-            "correctLetter": corr_letter,
-            "explanation": explanation
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/upload", methods=["POST"])
-def upload_file():
-    try:
-        if "file" not in request.files:
-            return jsonify({"error": "No file part"}), 400
-
-        file = request.files["file"]
-        if file.filename == "":
-            return jsonify({"error": "No selected file"}), 400
-
-        filename = file.filename.lower()
-        content = ""
-        stream = io.BytesIO(file.read())
-
-        # Extract text depending on file type
-        if filename.endswith(".txt"):
-            content = stream.read().decode("utf-8")
-        elif filename.endswith(".pdf"):
-            pdf_reader = PyPDF2.PdfReader(stream)
-            content = "\n".join(page.extract_text() for page in pdf_reader.pages)
-        elif filename.endswith(".docx"):
-            content = docx2txt.process(stream)
-        else:
-            return jsonify({"error": "Only PDF, DOCX, and TXT files are supported"}), 400
-
-        if not content.strip():
-            return jsonify({"error": "File is empty or unreadable"}), 400
-
-        return jsonify({"content": content})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+API_PORT = int(os.getenv("PORT", "5000"))
+FRONTEND_DIR = os.path.join(HERE, "..", "frontend")
+STATIC_DIR = os.path.join(FRONTEND_DIR, "dist")
+_app_static_folder = STATIC_DIR if os.path.exists(STATIC_DIR) else FRONTEND_DIR
 
 
+app = Flask(__name__, static_folder=_app_static_folder)
+CORS(app, resources={r"/*": {"origin": "*"}})
 
+
+if auth_bp:
+    app.register_blueprint(auth_bp)
+    print("Auth blueprint registered")
+else:
+    print("Auth blueprint NOT registered")
+
+
+if study_bp:
+    app.register_blueprint(study_bp)
+    print("Study blueprint registered")
+else:
+    print("Study blueprint NOT registered")
+
+
+if quiz_bp:
+    app.register_blueprint(quiz_bp)
+    print("Quiz blueprint registered")
+else:
+    print("Quiz blueprint NOT registered")
+
+if chat_bp:
+    app.register_blueprint(chat_bp)
+    print("Chat blueprint registered")
+else:
+    print("Chat blueprint NOT registered")
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "service": "edumate"})
+
+
+@app.errorhandler(404)
+def handle_404(e):
+    if request.path.startswith("/auth") or request.path.startswith("/study") or request.path.startswith("/quiz"):
+        return jsonify({"success": False, "error": "not_found"}), 404
+    static = app.static_folder or FRONTEND_DIR
+    index_path = os.path.join(static, "index.html")
+    if os.path.exists(index_path):
+        return send_from_directory(static, "index.html")
+    return jsonify({"error": "not found"}), 404
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import werkzeug
+    if isinstance(e, werkzeug.exceptions.HTTPException):
+        return e
+    if request.path.startswith("/auth") or request.path.startswith("/study") or request.path.startswith("/quiz"):
+        return jsonify({"success": False, "error": "server_error", "detail": str(e)}), 500
+    return jsonify({"error": "internal server error"}), 500
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_frontend(path):
+    static = app.static_folder or FRONTEND_DIR
+    full_path = os.path.join(static, path)
+    if path and os.path.exists(full_path):
+        return send_from_directory(static, path)
+    index_path = os.path.join(static, "index.html")
+    if os.path.exists(index_path):
+        return send_from_directory(static, "index.html")
+    return jsonify({"status": "ok", "note": "frontend not built; run frontend separately"})
+
+
+def print_routes():
+    print("\nRegistered Flask routes:")
+    for rule in app.url_map.iter_rules():
+        methods = ",".join(sorted(rule.methods))
+        print(f"{rule} -> {methods}")
+print_routes()
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5001))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=API_PORT, debug=True)
