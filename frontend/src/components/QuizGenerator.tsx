@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from "react";
 import Navigation from "./Navigation";
-import { uploadNotesForQuiz, checkAnswer, QuizItem } from "../services/api";
+import { uploadNotesForQuiz, checkAnswer, QuizItem as ApiQuizItem } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+
+// Use your backend address here, adjust if needed
+const API_BASE = "http://127.0.0.1:5001";
+
+interface QuizItemWithSelection extends ApiQuizItem {
+  userSelected: number | null;
+}
 
 const QuizGenerator: React.FC = () => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-
+  const userName = user?.name ?? "";
   const [file, setFile] = useState<File | null>(null);
   const [numQ, setNumQ] = useState<number>(5);
   const [difficulty, setDifficulty] = useState<string>("mixed");
-  const [quiz, setQuiz] = useState<QuizItem[]>([]);
+  const [quiz, setQuiz] = useState<QuizItemWithSelection[]>([]);
   const [current, setCurrent] = useState<number>(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<any>(null);
@@ -42,7 +49,7 @@ const QuizGenerator: React.FC = () => {
     try {
       const result = await uploadNotesForQuiz(file, numQ, difficulty);
       if (result?.success && result.quiz) {
-        const quizData = result.quiz.map((item: any) => ({
+        const quizData: QuizItemWithSelection[] = result.quiz.map((item: ApiQuizItem) => ({
           ...item,
           topic: item.topic || "",
           difficulty: item.difficulty || difficulty,
@@ -98,11 +105,12 @@ const QuizGenerator: React.FC = () => {
     }));
 
     try {
-      const res = await fetch(`/quiz`, {
+      const res = await fetch(`${API_BASE}/quiz`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId,
+          userName, // Added username here
           subject: quiz[0]?.topic || "",
           difficulty,
           num_questions: quiz.length,

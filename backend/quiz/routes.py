@@ -15,6 +15,7 @@ try:
 except ImportError:
     requests = None
 
+
 def extract_text_from_pdf(file):
     if not PyPDF2:
         return ""
@@ -27,11 +28,13 @@ def extract_text_from_pdf(file):
     except Exception:
         return ""
 
+
 def clamp(s: str, limit: int = 12000) -> str:
     if not s:
         return s
     s = s.strip()
     return s[:limit] if len(s) > limit else s
+
 
 def build_prompt(notes: str, num_q: int, difficulty: str) -> str:
     prompt = f"""Given the notes below, create exactly {num_q} contextually correct multiple-choice questions (MCQs) for a technical quiz.
@@ -58,6 +61,7 @@ Notes:
 \"\"\"{notes}\"\"\"
 """.strip()
     return prompt
+
 
 def normalize(items):
     map_letter = {"A": 0, "B": 1, "C": 2, "D": 3}
@@ -155,17 +159,19 @@ def save_quiz():
     try:
         data = request.get_json()
         user_id = data.get("userId")
+        user_name = data.get("userName")  # Add this line
         subject = data.get("subject", "")
         difficulty = data.get("difficulty", "")
         num_questions = data.get("num_questions", 0)
         score = data.get("score", 0.0)
         answers = data.get("answers", [])
 
-        if not user_id or num_questions <= 0 or not isinstance(answers, list):
+        if not user_id or num_questions <= 0 or not isinstance(answers, list) or not user_name:
             return jsonify({"success": False, "error": "Invalid input"}), 400
 
         db.save_quiz_attempt(
             user_id=user_id,
+            user_name=user_name,  # Pass username here
             subject=subject,
             difficulty=difficulty,
             num_questions=num_questions,
