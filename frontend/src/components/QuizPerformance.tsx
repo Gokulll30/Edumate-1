@@ -37,11 +37,11 @@ const QuizPerformance: React.FC = () => {
       console.log('Fetching quiz performance data...'); // Debug log
       
       // Check if user is authenticated
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        return;
-      }
+      //const token = localStorage.getItem('authToken');
+      //if (!token) {
+      //  setError('Authentication required. Please log in again.');
+      //  return;
+      //}
 
       const [historyResponse, statsResponse] = await Promise.all([
         getQuizHistory(),
