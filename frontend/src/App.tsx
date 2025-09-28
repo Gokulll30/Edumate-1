@@ -7,62 +7,88 @@ import ChatInterface from "./components/ChatInterface";
 import StudyPlanner from "./components/StudyPlanner";
 import ProgressTracker from "./components/ProgressTracker";
 import QuizGenerator from "./components/QuizGenerator";
+import QuizPerformance from "./components/QuizPerformance";
+import Navigation from "./components/Navigation";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import QuizPerformance from './components/QuizPerformance';
-
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
+  
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/" />;
   }
-  return children;
+  
+  return (
+    <div className="min-h-screen bg-gray-900">
+      <Navigation />
+      <main className="pt-16"> {/* Add padding-top to account for fixed navigation */}
+        {children}
+      </main>
+    </div>
+  );
 }
 
 function AppContent() {
   const { showAuthModal } = useAuth();
-
+  
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/landing" element={<LandingPage />} />
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/planner" element={
-          <ProtectedRoute>
-            <StudyPlanner />
-          </ProtectedRoute>
-        } />
-        <Route path="/progress" element={
-          <ProtectedRoute>
-            <ProgressTracker />
-          </ProtectedRoute>
-        } />
-        <Route path="/chat" element={
-          <ProtectedRoute>
-            <ChatInterface />
-          </ProtectedRoute>
-        } />
-        <Route path="/quiz" element={
-          <ProtectedRoute>
-            <QuizGenerator />
-          </ProtectedRoute>
-        } />
-        <Route path="/quiz-performance" element={
-          <ProtectedRoute>
-            <QuizPerformance />
-          </ProtectedRoute>
-        } />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-
-      {showAuthModal && <AuthModal />}
-    </Router>
+    <div className="min-h-screen bg-gray-900 text-white">
+      <Router>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/chat" 
+            element={
+              <ProtectedRoute>
+                <ChatInterface />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/planner" 
+            element={
+              <ProtectedRoute>
+                <StudyPlanner />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/progress" 
+            element={
+              <ProtectedRoute>
+                <ProgressTracker />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/quiz" 
+            element={
+              <ProtectedRoute>
+                <QuizGenerator />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/quiz-performance" 
+            element={
+              <ProtectedRoute>
+                <QuizPerformance />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+        {showAuthModal && <AuthModal />}
+      </Router>
+    </div>
   );
 }
 
