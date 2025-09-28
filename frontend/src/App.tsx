@@ -21,8 +21,11 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
   return (
     <div className="min-h-screen bg-gray-900">
       <Navigation />
-      <main className="pt-16"> {/* Add padding-top to account for fixed navigation */}
-        {children}
+      {/* Fixed padding to account for navigation height */}
+      <main className="pt-20 md:pt-16 pb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {children}
+        </div>
       </main>
     </div>
   );
@@ -76,6 +79,7 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+          {/* FIXED: Added the missing quiz-performance route */}
           <Route 
             path="/quiz-performance" 
             element={

@@ -1,57 +1,101 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, TrendingUp, Target, Clock, Trophy } from 'lucide-react';
-import { getUserQuizStats, UserQuizStats, QuizAttempt } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { getQuizHistory, getQuizStats } from '../services/api';
+
+interface QuizAttempt {
+  id: number;
+  topic: string;
+  difficulty: string;
+  score: number;
+  total_questions: number;
+  percentage: number;
+  time_taken: number;
+  created_at: string;
+}
+
+interface QuizStats {
+  total_attempts: number;
+  avg_percentage: number;
+  best_score: number;
+  last_attempt: string;
+}
 
 const QuizPerformance: React.FC = () => {
-  const { user } = useAuth();
-  const [stats, setStats] = useState<UserQuizStats | null>(null);
-  const [recentAttempts, setRecentAttempts] = useState<QuizAttempt[]>([]);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+  const [stats, setStats] = useState<QuizStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    if (user?.username) {
-      loadUserStats();
-    }
-  }, [user]);
+    fetchPerformanceData();
+  }, []);
 
-  const loadUserStats = async () => {
+  const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      const result = await getUserQuizStats(user!.username);
-      if (result.success) {
-        setStats(result.stats || null);
-        setRecentAttempts(result.recent_attempts || []);
-      } else {
-        setError(result.error || 'Failed to load stats');
+      setError('');
+      
+      console.log('Fetching quiz performance data...'); // Debug log
+      
+      // Check if user is authenticated
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        return;
       }
+
+      const [historyResponse, statsResponse] = await Promise.all([
+        getQuizHistory(),
+        getQuizStats()
+      ]);
+      
+      console.log('History response:', historyResponse); // Debug log
+      console.log('Stats response:', statsResponse); // Debug log
+      
+      if (historyResponse.success) {
+        setAttempts(historyResponse.data || []);
+      } else {
+        console.error('History error:', historyResponse.error);
+        setError(historyResponse.error || 'Failed to load quiz history');
+      }
+      
+      if (statsResponse.success) {
+        setStats(statsResponse.data || {
+          total_attempts: 0,
+          avg_percentage: 0,
+          best_score: 0,
+          last_attempt: ''
+        });
+      } else {
+        console.error('Stats error:', statsResponse.error);
+        // Don't set error for stats failure if history worked
+        if (!historyResponse.success) {
+          setError(statsResponse.error || 'Failed to load quiz stats');
+        }
+      }
+      
     } catch (err) {
-      setError('Failed to load quiz performance data');
+      console.error('Performance data fetch error:', err);
+      setError('Failed to load performance data. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}m ${secs}s`;
-  };
-
-  const getScoreColor = (percentage: number) => {
-    if (percentage >= 90) return 'text-green-500';
-    if (percentage >= 75) return 'text-blue-500';
-    if (percentage >= 60) return 'text-yellow-500';
-    return 'text-red-500';
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white pt-20 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading performance data...</p>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8 text-center">Quiz Performance</h1>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading performance data...</p>
+          </div>
         </div>
       </div>
     );
@@ -59,120 +103,162 @@ const QuizPerformance: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white pt-20 flex items-center justify-center">
-        <div className="text-center text-red-400">
-          <p>Error: {error}</p>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8 text-center">Quiz Performance</h1>
+        <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 text-center">
+          <div className="text-red-400 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-red-400 mb-4">{error}</p>
           <button 
-            onClick={loadUserStats}
-            className="mt-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
+            onClick={fetchPerformanceData}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           >
-            Retry
+            Try Again
           </button>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white pt-20">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex items-center mb-8">
-          <BarChart className="mr-3 h-8 w-8 text-blue-500" />
-          <h1 className="text-3xl font-bold">Quiz Performance</h1>
+  if (!stats || (stats.total_attempts === 0 && attempts.length === 0)) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8 text-center">Quiz Performance</h1>
+        <div className="bg-gray-800 rounded-lg p-8 text-center">
+          <div className="text-6xl mb-4">📊</div>
+          <h2 className="text-xl font-semibold mb-2">No Quiz Data Yet</h2>
+          <p className="text-gray-400 mb-6">Take your first quiz to see your performance statistics!</p>
+          <a 
+            href="/quiz" 
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Take a Quiz
+          </a>
         </div>
-
-        {!stats || stats.total_attempts === 0 ? (
-          <div className="text-center py-12">
-            <Trophy className="mx-auto h-16 w-16 text-gray-600 mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-400 mb-2">No Quiz Attempts Yet</h2>
-            <p className="text-gray-500">Take your first quiz to see your performance statistics!</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-gray-800 p-6 rounded-lg">
-                <div className="flex items-center">
-                  <Target className="h-8 w-8 text-blue-500 mr-3" />
-                  <div>
-                    <p className="text-sm text-gray-400">Total Attempts</p>
-                    <p className="text-2xl font-bold">{stats.total_attempts}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800 p-6 rounded-lg">
-                <div className="flex items-center">
-                  <TrendingUp className="h-8 w-8 text-green-500 mr-3" />
-                  <div>
-                    <p className="text-sm text-gray-400">Average Score</p>
-                    <p className="text-2xl font-bold">{stats.avg_percentage}%</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800 p-6 rounded-lg">
-                <div className="flex items-center">
-                  <Trophy className="h-8 w-8 text-yellow-500 mr-3" />
-                  <div>
-                    <p className="text-sm text-gray-400">Best Score</p>
-                    <p className="text-2xl font-bold">{stats.best_score}%</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800 p-6 rounded-lg">
-                <div className="flex items-center">
-                  <Clock className="h-8 w-8 text-purple-500 mr-3" />
-                  <div>
-                    <p className="text-sm text-gray-400">Last Attempt</p>
-                    <p className="text-sm font-semibold">
-                      {new Date(stats.last_attempt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Attempts */}
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <h2 className="text-xl font-semibold mb-4">Recent Quiz Attempts</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="pb-2">Date</th>
-                      <th className="pb-2">Topic</th>
-                      <th className="pb-2">Difficulty</th>
-                      <th className="pb-2">Score</th>
-                      <th className="pb-2">Percentage</th>
-                      <th className="pb-2">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentAttempts.map((attempt, index) => (
-                      <tr key={index} className="border-b border-gray-700">
-                        <td className="py-2">
-                          {new Date(attempt.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="py-2">{attempt.topic}</td>
-                        <td className="py-2 capitalize">{attempt.difficulty}</td>
-                        <td className="py-2">
-                          {attempt.score}/{attempt.total_questions}
-                        </td>
-                        <td className={`py-2 font-semibold ${getScoreColor(attempt.percentage)}`}>
-                          {attempt.percentage}%
-                        </td>
-                        <td className="py-2">{formatTime(attempt.time_taken)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8 text-center">Quiz Performance</h1>
+      
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-purple-900/20 border border-purple-500 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-purple-600 rounded-lg mr-4">
+                <span className="text-2xl">🎯</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Total Attempts</p>
+                <p className="text-2xl font-bold">{stats.total_attempts}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-green-900/20 border border-green-500 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-600 rounded-lg mr-4">
+                <span className="text-2xl">📊</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Average Score</p>
+                <p className="text-2xl font-bold">{Math.round(stats.avg_percentage)}%</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-blue-600 rounded-lg mr-4">
+                <span className="text-2xl">🏆</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Best Score</p>
+                <p className="text-2xl font-bold">{stats.best_score}%</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-orange-900/20 border border-orange-500 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-orange-600 rounded-lg mr-4">
+                <span className="text-2xl">📅</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Last Attempt</p>
+                <p className="text-lg font-bold">
+                  {stats.last_attempt ? new Date(stats.last_attempt).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quiz History Table */}
+      {attempts.length > 0 && (
+        <div className="bg-gray-800 rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-700">
+            <h2 className="text-xl font-semibold">Quiz History</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Topic</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Difficulty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Score</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Percentage</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {attempts.map((attempt) => (
+                  <tr key={attempt.id} className="hover:bg-gray-700/50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {new Date(attempt.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      {attempt.topic || 'General'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        attempt.difficulty === 'easy' ? 'bg-green-900 text-green-300' :
+                        attempt.difficulty === 'medium' ? 'bg-yellow-900 text-yellow-300' :
+                        'bg-red-900 text-red-300'
+                      }`}>
+                        {attempt.difficulty || 'mixed'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {attempt.score}/{attempt.total_questions}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-sm font-medium ${
+                        attempt.percentage >= 80 ? 'text-green-400' :
+                        attempt.percentage >= 60 ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {attempt.percentage}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                      {formatTime(attempt.time_taken || 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

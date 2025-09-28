@@ -358,16 +358,16 @@ def rename_chat_session(session_id: int, new_title: str, user_id: int) -> bool:
     return affected_rows > 0
 
 def save_chat_message(user_id: int, role: str, message: str, session_id: int = None):
-    """Save a chat message to database"""
+    import datetime
+    now = datetime.datetime.now().isoformat()
     try:
         conn = get_db_connection()
     except:
         conn = get_conn()
-    
-    conn.execute("""
-        INSERT INTO chats (user_id, role, message, session_id) VALUES (?, ?, ?, ?)
-    """, (user_id, role, message, session_id))
-    
+    conn.execute(
+        "INSERT INTO chats (user_id, role, message, session_id, created_at) VALUES (?, ?, ?, ?, ?)",
+        (user_id, role, message, session_id, now)
+    )
     conn.commit()
 
 def get_chat_history(user_id: int, limit: int = 50, session_id: int = None) -> List[Dict]:
