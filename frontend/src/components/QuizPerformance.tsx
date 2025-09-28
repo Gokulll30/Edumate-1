@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getQuizHistory, getQuizStats } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface QuizAttempt {
   id: number;
@@ -24,28 +25,40 @@ const QuizPerformance: React.FC = () => {
   const [stats, setStats] = useState<QuizStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  
+  // Get current logged-in user from context
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    fetchPerformanceData();
-  }, []);
+    console.log('QuizPerformance - Auth loading:', authLoading, 'User:', user); // Debug log
+    
+    if (!authLoading) {
+      if (user?.id) {
+        fetchPerformanceData();
+      } else {
+        setLoading(false);
+        setError('Authentication required. Please log in again.');
+      }
+    }
+  }, [user, authLoading]);
 
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
       setError('');
       
-      console.log('Fetching quiz performance data...'); // Debug log
+      console.log('Fetching quiz performance data for user:', user?.id); // Debug log
       
-      // Check if user is authenticated
-      //const token = localStorage.getItem('authToken');
-      //if (!token) {
-      //  setError('Authentication required. Please log in again.');
-      //  return;
-      //}
+      if (!user?.id) {
+        setError('User not logged in');
+        return;
+      }
+
+      const userId = user.id;
 
       const [historyResponse, statsResponse] = await Promise.all([
-        getQuizHistory(),
-        getQuizStats()
+        getQuizHistory(userId),
+        getQuizStats(userId)
       ]);
       
       console.log('History response:', historyResponse); // Debug log
@@ -55,7 +68,6 @@ const QuizPerformance: React.FC = () => {
         setAttempts(historyResponse.data || []);
       } else {
         console.error('History error:', historyResponse.error);
-        setError(historyResponse.error || 'Failed to load quiz history');
       }
       
       if (statsResponse.success) {
@@ -67,10 +79,11 @@ const QuizPerformance: React.FC = () => {
         });
       } else {
         console.error('Stats error:', statsResponse.error);
-        // Don't set error for stats failure if history worked
-        if (!historyResponse.success) {
-          setError(statsResponse.error || 'Failed to load quiz stats');
-        }
+      }
+      
+      // Only set error if both failed
+      if (!historyResponse.success && !statsResponse.success) {
+        setError('Failed to load performance data. Please try again.');
       }
       
     } catch (err) {
@@ -87,6 +100,41 @@ const QuizPerformance: React.FC = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Show loading during auth check
+  if (authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8 text-center">Quiz Performance</h1>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-400">Checking authentication...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login message if user not authenticated
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8 text-center">Quiz Performance</h1>
+        <div className="bg-gray-800 rounded-lg p-8 text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-xl font-semibold mb-2">Please Log In</h2>
+          <p className="text-gray-400 mb-6">You need to be logged in to view your quiz performance.</p>
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -94,7 +142,7 @@ const QuizPerformance: React.FC = () => {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading performance data...</p>
+            <p className="text-gray-400">Loading performance data for {user.name || user.email}...</p>
           </div>
         </div>
       </div>
@@ -112,12 +160,20 @@ const QuizPerformance: React.FC = () => {
             </svg>
           </div>
           <p className="text-red-400 mb-4">{error}</p>
-          <button 
-            onClick={fetchPerformanceData}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Try Again
-          </button>
+          <div className="space-x-4">
+            <button 
+              onClick={fetchPerformanceData}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Try Again
+            </button>
+            <button 
+              onClick={() => window.location.href = '/'}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Go to Login
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -144,7 +200,9 @@ const QuizPerformance: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">Quiz Performance</h1>
+      <h1 className="text-3xl font-bold mb-8 text-center">
+        Quiz Performance - {user.name || user.email}
+      </h1>
       
       {/* Stats Cards */}
       {stats && (
