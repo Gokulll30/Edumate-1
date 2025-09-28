@@ -1,105 +1,72 @@
-from flask import Blueprint, request, jsonify, current_app
-import db
-import jwt
-import datetime
-import os
+from flask import Blueprint, request, jsonify, g, current_app
+from werkzeug.security import check_password_hash, generate_password_hash
+import sqlite3
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
-JWT_SECRET = os.getenv("JWT_SECRET", "your_secret_key_here")
-JWT_ALGORITHM = "HS256"
-JWT_EXP_DELTA_SECONDS = 86400  # 1 day token expiry
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect(current_app.config.get('DATABASE', 'data/edumate.sqlite3'))
+        g.db.row_factory = sqlite3.Row
+    return g.db
 
-
-def encode_auth_token(user_id, username):
-    try:
-        payload = {
-            "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=JWT_EXP_DELTA_SECONDS),
-            "iat": datetime.datetime.utcnow(),
-            "sub": user_id,
-            "username": username,
-        }
-        return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    except Exception:
-        return None
-
-
-def decode_auth_token(token):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return {"user_id": payload["sub"], "username": payload["username"]}
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
-
-@auth_bp.route("/signup", methods=["POST"])
-def signup():
-    print("Signup endpoint hit")
-    try:
-        data = request.get_json(force=True) or {}
-    except Exception as e:
-        current_app.logger.error("Failed to parse JSON: %s", e)
-        return jsonify({"success": False, "error": "invalid_json"}), 400
-
-    name = data.get("name", "") or ""
-    email = data.get("email")
-    password = data.get("password")
-
-    if not email or not password:
-        return jsonify({"success": False, "error": "missing_fields"}), 400
-
-    try:
-        user = db.create_user(email, password, name)
-        return jsonify({"success": True, "user": user}), 201
-    except ValueError as e:
-        if str(e) == "username_exists":
-            return jsonify({"success": False, "error": "username_exists"}), 400
-        current_app.logger.error("Signup failed ValueError: %s", e)
-        return jsonify({"success": False, "error": "unknown"}), 500
-    except Exception as e:
-        current_app.logger.error("Internal error in signup: %s", e, exc_info=True)
-        return jsonify({"success": False, "error": "server_error", "detail": str(e)}), 500
-
-
-@auth_bp.route("/login", methods=["POST"])
+@auth_bp.route('/login', methods=['POST'])
 def login():
-    print("Login endpoint hit")
     try:
-        data = request.get_json(force=True) or {}
-    except Exception as e:
-        current_app.logger.error("Failed to parse JSON: %s", e)
-        return jsonify({"success": False, "error": "invalid_json"}), 400
+        data = request.get_json(force=True)
+        username = data.get('username')
+        password = data.get('password')
 
-    email = data.get("email")
-    password = data.get("password")
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Username and password required'}), 400
 
-    if not email or not password:
-        return jsonify({"success": False, "error": "missing_fields"}), 400
+        db = get_db()
+        user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
 
-    try:
-        result = db.verify_user(email, password)
+        if user is None or not check_password_hash(user['password_hash'], password):
+            return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
 
-        if result.get("status") == "no_user":
-            return jsonify({"success": False, "error": "no_user"}), 404
-        if result.get("status") == "invalid_password":
-            return jsonify({"success": False, "error": "invalid_password"}), 401
-
-        user = result.get("user")
-        token = encode_auth_token(user["id"], user["username"])
-        if not token:
-            raise Exception("Token generation failed")
-
-        try:
-            db.log_login(int(user["id"]))
-        except Exception as e:
-            current_app.logger.warning("Failed to log login: %s", e)
-            pass
-
-        progress = db.compute_progress(int(user["id"]))
-        return jsonify({"success": True, "user": user, "token": token, "progress": progress}), 200
+        user_data = {key: user[key] for key in user.keys() if key != 'password_hash'}
+        # TODO: Add session or token generation here
+        return jsonify({'success': True, 'user': user_data})
 
     except Exception as e:
-        current_app.logger.error("Internal error in login: %s", e, exc_info=True)
-        return jsonify({"success": False, "error": "server_error", "detail": str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@auth_bp.route('/signup', methods=['POST'])
+def signup():
+    try:
+        data = request.get_json(force=True)
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Username and password required'}), 400
+
+        db = get_db()
+        exist = db.execute('SELECT 1 FROM users WHERE username = ?', (username,)).fetchone()
+        if exist:
+            return jsonify({'success': False, 'error': 'Username already taken'}), 400
+
+        pw_hash = generate_password_hash(password)
+        db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', (username, pw_hash))
+        db.commit()
+
+        user = db.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
+        return jsonify({'success': True, 'user': dict(user)}), 201
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# JSON error handlers
+@auth_bp.app_errorhandler(404)
+def handle_404(e):
+    return jsonify({'success': False, 'error': 'Not found'}), 404
+
+@auth_bp.app_errorhandler(405)
+def handle_405(e):
+    return jsonify({'success': False, 'error': 'Method not allowed'}), 405
+
+@auth_bp.app_errorhandler(500)
+def handle_500(e):
+    return jsonify({'success': False, 'error': 'Internal server error'}), 500

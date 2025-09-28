@@ -1,113 +1,110 @@
 import os
 import sys
-from flask import Flask, jsonify, send_from_directory, request
+import sqlite3
+
+from flask import Flask, jsonify, g, send_from_directory, request
 from flask_cors import CORS
 from dotenv import load_dotenv
-from quiz.routes import quiz_bp
-load_dotenv()
-HERE = os.path.dirname(__file__)
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+
+# Path setup
+APP_DIR = os.path.dirname(__file__)
+load_dotenv(os.path.join(APP_DIR, "..", ".env"))
+
+if APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
+
+# SQLite DB path
+DATABASE = os.path.join(APP_DIR, "data", "edumate.sqlite3")
+
+# DB connection management
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+def close_db(e=None):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+# Flask app initialization
+app = Flask(__name__)
+app.teardown_appcontext(close_db)
+app.config["DATABASE"] = DATABASE
+
+# CORS configuration
+CORS(
+    app,
+    origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://*.vercel.app",
+        "https://edumate-2026.vercel.app"
+    ],
+    methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+    supports_credentials=False,
+)
+
+# Register blueprints with error handling
 try:
     from auth.routes import auth_bp
+    app.register_blueprint(auth_bp)
 except Exception as e:
-    print("Failed to import auth.routes:", e)
-    auth_bp = None
-from study.routes import study_bp
+    print(f"Auth blueprint registration failed: {e}")
+
 try:
     from quiz.routes import quiz_bp
+    app.register_blueprint(quiz_bp, url_prefix="/quiz")
 except Exception as e:
-    print("Failed to import quiz.routes:", e)
-    quiz_bp = None
+    print(f"Quiz blueprint registration failed: {e}")
 
-# Add these lines to import and register chat blueprint
 try:
     from chat.routes import chat_bp
+    app.register_blueprint(chat_bp, url_prefix="/chat")
 except Exception as e:
-    print("Failed to import chat.routes:", e)
-    chat_bp = None
+    print(f"Chat blueprint registration failed: {e}")
 
-API_PORT = int(os.getenv("PORT", "5000"))
-FRONTEND_DIR = os.path.join(HERE, "..", "frontend")
-STATIC_DIR = os.path.join(FRONTEND_DIR, "dist")
-_app_static_folder = STATIC_DIR if os.path.exists(STATIC_DIR) else FRONTEND_DIR
+try:
+    from study.routes import study_bp
+    app.register_blueprint(study_bp, url_prefix="/study")
+except Exception as e:
+    print(f"Study blueprint registration failed: {e}")
 
-
-app = Flask(__name__, static_folder=_app_static_folder)
-CORS(app, resources={r"/*": {"origin": "*"}})
-
-
-if auth_bp:
-    app.register_blueprint(auth_bp)
-    print("Auth blueprint registered")
-else:
-    print("Auth blueprint NOT registered")
-
-
-if study_bp:
-    app.register_blueprint(study_bp)
-    print("Study blueprint registered")
-else:
-    print("Study blueprint NOT registered")
-
-
-if quiz_bp:
-    app.register_blueprint(quiz_bp)
-    print("Quiz blueprint registered")
-else:
-    print("Quiz blueprint NOT registered")
-
-if chat_bp:
-    app.register_blueprint(chat_bp)
-    print("Chat blueprint registered")
-else:
-    print("Chat blueprint NOT registered")
-
-
-@app.route("/health")
+# Health Check Route
+@app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "service": "edumate"})
+    return jsonify({"status": "ok", "service": "edumate-backend"})
 
-
-@app.errorhandler(404)
-def handle_404(e):
-    if request.path.startswith("/auth") or request.path.startswith("/study") or request.path.startswith("/quiz"):
-        return jsonify({"success": False, "error": "not_found"}), 404
-    static = app.static_folder or FRONTEND_DIR
-    index_path = os.path.join(static, "index.html")
-    if os.path.exists(index_path):
-        return send_from_directory(static, "index.html")
-    return jsonify({"error": "not found"}), 404
-
-
-@app.errorhandler(Exception)
-def handle_exception(e):
-    import werkzeug
-    if isinstance(e, werkzeug.exceptions.HTTPException):
-        return e
-    if request.path.startswith("/auth") or request.path.startswith("/study") or request.path.startswith("/quiz"):
-        return jsonify({"success": False, "error": "server_error", "detail": str(e)}), 500
-    return jsonify({"error": "internal server error"}), 500
-
-
+# Serve Frontend Static Files (for SPA)
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_frontend(path):
-    static = app.static_folder or FRONTEND_DIR
-    full_path = os.path.join(static, path)
-    if path and os.path.exists(full_path):
-        return send_from_directory(static, path)
-    index_path = os.path.join(static, "index.html")
-    if os.path.exists(index_path):
-        return send_from_directory(static, "index.html")
-    return jsonify({"status": "ok", "note": "frontend not built; run frontend separately"})
+    frontend_dir = os.path.join(APP_DIR, "..", "frontend", "dist")
+    if path and os.path.exists(os.path.join(frontend_dir, path)):
+        return send_from_directory(frontend_dir, path)
+    else:
+        return send_from_directory(frontend_dir, "index.html")
 
+# JSON error handlers
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"success": False, "error": "Not found"}), 404
 
-def print_routes():
-    print("\nRegistered Flask routes:")
-    for rule in app.url_map.iter_rules():
-        methods = ",".join(sorted(rule.methods))
-        print(f"{rule} -> {methods}")
-print_routes()
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return jsonify({"success": False, "error": "Method not allowed"}), 405
+
+@app.errorhandler(500)
+def internal_error(e):
+    return jsonify({"success": False, "error": "Internal server error"}), 500
+
+# Run the application
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=API_PORT, debug=True)
+    print("Registered routes:")
+    for rule in app.url_map.iter_rules():
+        methods = ",".join(rule.methods)
+        print(f"{rule.rule} [{methods}]")
+    port = int(os.getenv("PORT", 5001))
+    app.run(host="0.0.0.0", port=port, debug=True)
