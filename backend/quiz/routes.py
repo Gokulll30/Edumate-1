@@ -80,7 +80,7 @@ def upload_and_generate():
         difficulty = request.form.get("difficulty", "mixed")
 
         # Clamp text size for prompt token limits
-        text = clamp(text, max_tokens=2000)
+        text = clamp(text, max_tokens=20000)
 
         # Build MCQ prompt with your exact format
         prompt = build_mcq_prompt(text, num_questions, difficulty)
