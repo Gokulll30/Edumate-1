@@ -14,7 +14,7 @@ def get_db():
 def login():
     try:
         data = request.get_json(force=True)
-        username = data.get('username')
+        username = data.get('username') or data.get('email')
         password = data.get('password')
 
         if not username or not password:
