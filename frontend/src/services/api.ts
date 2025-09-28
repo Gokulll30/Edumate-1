@@ -78,3 +78,52 @@ export async function checkHealth(): Promise<{ status: string; service: string }
   const response = await fetch(`${API_BASE}/health`);
   return await response.json();
 }
+// Add to your existing api.ts file
+
+export interface QuizResult {
+  username: string;
+  score: number;
+  total_questions: number;
+  topic?: string;
+  difficulty?: string;
+  time_taken?: number;
+}
+
+export interface QuizAttempt {
+  score: number;
+  total_questions: number;
+  percentage: number;
+  topic: string;
+  difficulty: string;
+  time_taken: number;
+  created_at: string;
+}
+
+export interface UserQuizStats {
+  total_attempts: number;
+  avg_percentage: number;
+  best_score: number;
+  worst_score: number;
+  last_attempt: string;
+}
+
+// Save quiz result
+export async function saveQuizResult(result: QuizResult): Promise<{ success: boolean; percentage?: number; error?: string }> {
+  const response = await fetch(`${API_BASE}/quiz/save-result`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(result),
+  });
+  return await response.json();
+}
+
+// Get user quiz statistics
+export async function getUserQuizStats(username: string): Promise<{ 
+  success: boolean; 
+  stats?: UserQuizStats; 
+  recent_attempts?: QuizAttempt[];
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/quiz/user-stats/${username}`);
+  return await response.json();
+}

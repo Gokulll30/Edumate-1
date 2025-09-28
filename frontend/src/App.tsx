@@ -8,6 +8,8 @@ import StudyPlanner from "./components/StudyPlanner";
 import ProgressTracker from "./components/ProgressTracker";
 import QuizGenerator from "./components/QuizGenerator";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import QuizPerformance from './components/QuizPerformance';
+
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
@@ -50,6 +52,12 @@ function AppContent() {
             <QuizGenerator />
           </ProtectedRoute>
         } />
+        <Route path="/quiz-performance" element={
+          <ProtectedRoute>
+            <QuizPerformance />
+          </ProtectedRoute>
+        } />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
