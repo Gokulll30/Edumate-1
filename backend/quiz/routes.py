@@ -1,8 +1,10 @@
 import io
 import os
 import json
+import sqlite3
+from datetime import datetime
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from google import genai
 from utils.pdf import read_pdf
 from utils.text import read_txt, clamp
@@ -10,18 +12,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Get API key from environment (local .env or Render env vars)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not set in environment variables")
 
-# Initialize Gemini client
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 quiz_bp = Blueprint("quiz", __name__)
 
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect('data/edumate.sqlite3')
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
 def build_mcq_prompt(text, num_q, difficulty="mixed"):
-    """Build the exact prompt format you specified"""
     prompt = f"""Given the notes below, create exactly {num_q} contextually correct multiple-choice questions (MCQs) for a technical quiz.
 Strict rules:
 - Only use content, facts, terminology, and structure from the supplied notes.
@@ -53,9 +58,6 @@ Return only the JSON array, nothing else."""
 
 @quiz_bp.route("/upload", methods=["POST"])
 def upload_and_generate():
-    """
-    Endpoint to upload PDF or TXT notes and generate multiple choice quizzes
-    """
     try:
         file = request.files.get("file")
         if not file:
@@ -63,7 +65,6 @@ def upload_and_generate():
 
         filename = file.filename.lower()
         ext = os.path.splitext(filename)[1]
-
         stream = io.BytesIO(file.read())
 
         if ext == ".pdf":
@@ -79,28 +80,22 @@ def upload_and_generate():
         num_questions = int(request.form.get("numq", 5))
         difficulty = request.form.get("difficulty", "mixed")
 
-        # Clamp text size for prompt token limits
-        text = clamp(text, max_tokens=20000)
+        # Clamp text length (limit parameter, not max_tokens)
+        text = clamp(text, limit=12000)
 
-        # Build MCQ prompt with your exact format
         prompt = build_mcq_prompt(text, num_questions, difficulty)
-
-        # Generate quiz with Gemini API
         response = client.models.generate_content(
             model="gemini-2.0-flash-exp",
             contents=prompt
         )
-
-        # Parse the JSON response
         quiz_data = json.loads(response.text)
 
-        # Normalize the data to ensure consistency
         normalized_quiz = []
         for i, item in enumerate(quiz_data):
             normalized_item = {
                 "question": item["question"],
                 "options": item["options"],
-                "answerIndex": ord(item["answer"]) - ord("A"),  # Convert A,B,C,D to 0,1,2,3
+                "answerIndex": ord(item["answer"]) - ord("A"),
                 "answerLetter": item["answer"],
                 "explanation": item["explanation"],
                 "difficulty": item["difficulty"],
@@ -109,20 +104,13 @@ def upload_and_generate():
             normalized_quiz.append(normalized_item)
 
         return jsonify({"success": True, "quiz": normalized_quiz})
-
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-
 @quiz_bp.route("/check", methods=["POST"])
 def check_answer():
-    """
-    Endpoint to check a user's selected answer for a quiz question.
-    Expects JSON with quiz, questionIndex, selectedIndex fields.
-    """
     try:
         data = request.get_json(force=True)
-
         quiz = data.get("quiz")
         question_index = data.get("questionIndex")
         selected_index = data.get("selectedIndex")
@@ -135,7 +123,7 @@ def check_answer():
         correct_letter = question.get("answerLetter", "")
         explanation = question.get("explanation", "")
 
-        is_correct = (selected_index == correct_index)
+        is_correct = selected_index == correct_index
 
         return jsonify({
             "success": True,
@@ -144,6 +132,105 @@ def check_answer():
             "correctLetter": correct_letter,
             "explanation": explanation,
         })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
+@quiz_bp.route("/save-result", methods=["POST"])
+def save_quiz_result():
+    try:
+        data = request.get_json(force=True)
+        username = data.get("username")
+        score = data.get("score")
+        total_questions = data.get("total_questions")
+        topic = data.get("topic", "General")
+        difficulty = data.get("difficulty", "mixed")
+        time_taken = data.get("time_taken", 0)  # in seconds
+
+        if not username or score is None or not total_questions:
+            return jsonify({"success": False, "error": "Missing required fields: username, score, total_questions"}), 400
+
+        percentage = round((score / total_questions) * 100, 2)
+        db = get_db()
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                total_questions INTEGER NOT NULL,
+                percentage REAL NOT NULL,
+                topic TEXT,
+                difficulty TEXT,
+                time_taken INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (username) REFERENCES users (username)
+            )
+        """)
+        db.execute("""
+            INSERT INTO quiz_attempts 
+            (username, score, total_questions, percentage, topic, difficulty, time_taken)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (username, score, total_questions, percentage, topic, difficulty, time_taken))
+        db.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Quiz result saved successfully",
+            "percentage": percentage
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@quiz_bp.route("/user-stats/<username>", methods=["GET"])
+def get_user_quiz_stats(username):
+    try:
+        db = get_db()
+        stats = db.execute("""
+            SELECT 
+                COUNT(*) as total_attempts,
+                ROUND(AVG(percentage), 2) as avg_percentage,
+                MAX(percentage) as best_score,
+                MIN(percentage) as worst_score,
+                MAX(created_at) as last_attempt
+            FROM quiz_attempts 
+            WHERE username = ?
+        """, (username,)).fetchone()
+
+        recent_attempts = db.execute("""
+            SELECT score, total_questions, percentage, topic, difficulty, 
+                   time_taken, created_at
+            FROM quiz_attempts 
+            WHERE username = ?
+            ORDER BY created_at DESC 
+            LIMIT 10
+        """, (username,)).fetchall()
+
+        return jsonify({
+            "success": True,
+            "stats": dict(stats) if stats else None,
+            "recent_attempts": [dict(attempt) for attempt in recent_attempts]
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@quiz_bp.route("/leaderboard", methods=["GET"])
+def get_leaderboard():
+    try:
+        db = get_db()
+        leaderboard = db.execute("""
+            SELECT 
+                username,
+                COUNT(*) as total_attempts,
+                ROUND(AVG(percentage), 2) as avg_percentage,
+                MAX(percentage) as best_score
+            FROM quiz_attempts 
+            GROUP BY username
+            ORDER BY avg_percentage DESC, best_score DESC
+            LIMIT 10
+        """).fetchall()
+
+        return jsonify({
+            "success": True,
+            "leaderboard": [dict(user) for user in leaderboard]
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
