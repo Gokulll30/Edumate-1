@@ -10,6 +10,11 @@ from mcq.prompt import MCQ_SCHEMA, build_mcq_prompt
 from mcq.parser import normalize_mcqs
 from dotenv import load_dotenv
 
+# Import auth functions
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from auth.routes import decode_auth_token
+
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -17,7 +22,6 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not set in environment variables")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-
 quiz_bp = Blueprint("quiz", __name__)
 
 def get_db():
@@ -25,6 +29,19 @@ def get_db():
         g.db = sqlite3.connect('data/edumate.sqlite3')
         g.db.row_factory = sqlite3.Row
     return g.db
+
+def get_user_from_token():
+    """Helper function to get user from auth token"""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return None
+    
+    user_data = decode_auth_token(token)
+    if user_data and "username" in user_data:
+        db = get_db()
+        user = db.execute('SELECT * FROM users WHERE username = ?', (user_data["username"],)).fetchone()
+        return dict(user) if user else None
+    return None
 
 @quiz_bp.route("/upload", methods=["POST"])
 def upload_and_generate():
@@ -35,7 +52,6 @@ def upload_and_generate():
         f = request.files["file"]
         filename = f.filename or ""
         ext = filename.lower().strip()
-
         stream = io.BytesIO(f.read())
 
         if ext.endswith(".pdf"):
@@ -51,7 +67,6 @@ def upload_and_generate():
 
         num_q = int(request.form.get("numq", 5))
         difficulty = request.form.get("difficulty", "mixed")
-
         prompt = build_mcq_prompt(text, num_q=num_q, difficulty=difficulty)
 
         response = client.models.generate_content(
@@ -100,9 +115,13 @@ def check_answer():
 @quiz_bp.route("/save-result", methods=["POST"])
 def save_quiz_result():
     try:
+        user = get_user_from_token()
         data = request.get_json(force=True)
-
-        username = data.get("username")
+        
+        # Use authenticated user's username if available, otherwise fall back to provided username
+        username = user["username"] if user else data.get("username")
+        user_id = user["id"] if user else None
+        
         score = data.get("score")
         total_questions = data.get("total_questions")
         topic = data.get("topic", "General")
@@ -113,11 +132,13 @@ def save_quiz_result():
             return jsonify({"success": False, "error": "Missing required fields"}), 400
 
         percentage = round((score / total_questions) * 100, 2)
-
         db = get_db()
+
+        # Create table if not exists
         db.execute("""
             CREATE TABLE IF NOT EXISTS quiz_attempts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
                 username TEXT NOT NULL,
                 score INTEGER NOT NULL,
                 total_questions INTEGER NOT NULL,
@@ -125,43 +146,118 @@ def save_quiz_result():
                 topic TEXT,
                 difficulty TEXT,
                 time_taken INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
-        db.execute("""
-            INSERT INTO quiz_attempts 
-            (username, score, total_questions, percentage, topic, difficulty, time_taken)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (username, score, total_questions, percentage, topic, difficulty, time_taken))
-        db.commit()
 
+        db.execute("""
+            INSERT INTO quiz_attempts
+            (user_id, username, score, total_questions, percentage, topic, difficulty, time_taken)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, username, score, total_questions, percentage, topic, difficulty, time_taken))
+
+        db.commit()
         return jsonify({"success": True, "message": "Quiz result saved successfully", "percentage": percentage})
 
     except Exception as e:
         print(f"Error in save_quiz_result: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@quiz_bp.route("/history", methods=["GET"])
+def quiz_history():
+    """Get quiz history for authenticated user"""
+    user = get_user_from_token()
+    if not user:
+        return jsonify({"error": "Authentication required"}), 401
+    
+    try:
+        limit = int(request.args.get("limit", 50))
+        db = get_db()
+        
+        attempts = db.execute("""
+            SELECT id, score, total_questions, percentage, topic, difficulty, time_taken, created_at
+            FROM quiz_attempts 
+            WHERE user_id = ? OR username = ?
+            ORDER BY created_at DESC 
+            LIMIT ?
+        """, (user["id"], user["username"], limit)).fetchall()
+        
+        return jsonify({
+            "success": True,
+            "data": [dict(attempt) for attempt in attempts]
+        })
+        
+    except Exception as e:
+        print(f"Quiz history error: {e}")
+        return jsonify({"error": "Failed to get quiz history"}), 500
+
+@quiz_bp.route("/stats", methods=["GET"])
+def quiz_stats():
+    """Get quiz statistics for authenticated user"""
+    user = get_user_from_token()
+    if not user:
+        return jsonify({"error": "Authentication required"}), 401
+    
+    try:
+        db = get_db()
+        
+        stats = db.execute("""
+            SELECT
+                COUNT(*) as total_attempts,
+                ROUND(AVG(percentage), 2) as avg_percentage,
+                MAX(percentage) as best_score,
+                MAX(created_at) as last_attempt
+            FROM quiz_attempts
+            WHERE user_id = ? OR username = ?
+        """, (user["id"], user["username"])).fetchone()
+        
+        if stats and stats['total_attempts'] > 0:
+            result = {
+                'total_attempts': stats['total_attempts'],
+                'avg_percentage': float(stats['avg_percentage'] or 0),
+                'best_score': int(stats['best_score'] or 0),
+                'last_attempt': stats['last_attempt']
+            }
+        else:
+            result = {
+                'total_attempts': 0,
+                'avg_percentage': 0,
+                'best_score': 0,
+                'last_attempt': None
+            }
+        
+        return jsonify({
+            "success": True,
+            "data": result
+        })
+        
+    except Exception as e:
+        print(f"Quiz stats error: {e}")
+        return jsonify({"error": "Failed to get quiz stats"}), 500
+
 @quiz_bp.route("/user-stats/<username>", methods=["GET"])
 def get_user_quiz_stats(username):
     try:
         db = get_db()
+        
         stats = db.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) as total_attempts,
                 ROUND(AVG(percentage), 2) as avg_percentage,
                 MAX(percentage) as best_score,
                 MIN(percentage) as worst_score,
                 MAX(created_at) as last_attempt
-            FROM quiz_attempts 
+            FROM quiz_attempts
             WHERE username = ?
         """, (username,)).fetchone()
 
         recent_attempts = db.execute("""
-            SELECT score, total_questions, percentage, topic, difficulty, 
+            SELECT score, total_questions, percentage, topic, difficulty,
                    time_taken, created_at
-            FROM quiz_attempts 
+            FROM quiz_attempts
             WHERE username = ?
-            ORDER BY created_at DESC 
+            ORDER BY created_at DESC
             LIMIT 10
         """, (username,)).fetchall()
 
@@ -179,13 +275,14 @@ def get_user_quiz_stats(username):
 def get_leaderboard():
     try:
         db = get_db()
+        
         leaderboard = db.execute("""
-            SELECT 
+            SELECT
                 username,
                 COUNT(*) as total_attempts,
                 ROUND(AVG(percentage), 2) as avg_percentage,
                 MAX(percentage) as best_score
-            FROM quiz_attempts 
+            FROM quiz_attempts
             GROUP BY username
             ORDER BY avg_percentage DESC, best_score DESC
             LIMIT 10

@@ -10,8 +10,7 @@ load_dotenv()
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
-SECRET_KEY='Kjs8u9dxw7Gkn2LbVbXEcmJNv4Y6Tq1D'
-
+SECRET_KEY = 'Kjs8u9dxw7Gkn2LbVbXEcmJNv4Y6Tq1D'
 
 def get_db():
     if 'db' not in g:
@@ -62,6 +61,16 @@ def login():
         user_data = {key: user[key] for key in user.keys() if key != 'password_hash'}
         token = create_auth_token(user_data)
 
+        # Log successful login (optional)
+        try:
+            db.execute("""
+                INSERT INTO login_sessions (user_id, login_at) 
+                VALUES (?, datetime('now'))
+            """, (user['id'],))
+            db.commit()
+        except:
+            pass  # Continue even if logging fails
+
         return jsonify({'success': True, 'token': token, 'user': user_data})
 
     except Exception as e:
@@ -73,6 +82,7 @@ def signup():
         data = request.get_json(force=True)
         username = data.get('username')
         password = data.get('password')
+        email = data.get('email', '')  # Optional email field
 
         if not username or not password:
             return jsonify({'success': False, 'error': 'Username and password required'}), 400
@@ -83,7 +93,22 @@ def signup():
             return jsonify({'success': False, 'error': 'Username already taken'}), 400
 
         pw_hash = generate_password_hash(password)
-        db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', (username, pw_hash))
+        
+        # Handle different user table structures
+        try:
+            # Try with email column first
+            db.execute('INSERT INTO users (username, email, password_hash, created_at) VALUES (?, ?, ?, datetime("now"))', 
+                      (username, email, pw_hash))
+        except sqlite3.OperationalError:
+            # Fall back to basic structure
+            try:
+                db.execute('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, datetime("now"))', 
+                          (username, pw_hash))
+            except sqlite3.OperationalError:
+                # Most basic structure
+                db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', 
+                          (username, pw_hash))
+        
         db.commit()
 
         user = db.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
@@ -111,3 +136,73 @@ def profile():
         return jsonify({"error": "User not found"}), 404
 
     return jsonify({"id": user["id"], "username": user["username"]})
+
+@auth_bp.route('/logout', methods=['POST'])
+def logout():
+    """
+    Logout endpoint - mainly for frontend to clear token
+    Can also update login_sessions table if needed
+    """
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if token:
+        user_data = decode_auth_token(token)
+        if user_data:
+            try:
+                db = get_db()
+                # Update last login session logout time
+                db.execute("""
+                    UPDATE login_sessions 
+                    SET logout_at = datetime('now'),
+                        active_seconds = (strftime('%s', datetime('now')) - strftime('%s', login_at))
+                    WHERE user_id = ? AND logout_at IS NULL
+                    ORDER BY login_at DESC LIMIT 1
+                """, (user_data["id"],))
+                db.commit()
+            except:
+                pass  # Continue even if logging fails
+    
+    return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+@auth_bp.route('/verify', methods=['GET'])
+def verify_token():
+    """
+    Verify if a token is still valid
+    """
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"valid": False, "error": "No token provided"}), 401
+    
+    user_data = decode_auth_token(token)
+    if not user_data:
+        return jsonify({"valid": False, "error": "Invalid or expired token"}), 401
+    
+    return jsonify({"valid": True, "user": {"id": user_data["id"], "username": user_data["username"]}})
+
+# Helper function for other routes to get authenticated user
+def get_user_from_token():
+    """
+    Helper function to get user from auth token - can be imported by other routes
+    """
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return None
+    
+    user_data = decode_auth_token(token)
+    if user_data and "username" in user_data:
+        db = get_db()
+        user = db.execute('SELECT * FROM users WHERE username = ?', (user_data["username"],)).fetchone()
+        return dict(user) if user else None
+    return None
+
+# JSON error handlers
+@auth_bp.app_errorhandler(404)
+def handle_404(e):
+    return jsonify({'success': False, 'error': 'Not found'}), 404
+
+@auth_bp.app_errorhandler(405)
+def handle_405(e):
+    return jsonify({'success': False, 'error': 'Method not allowed'}), 405
+
+@auth_bp.app_errorhandler(500)
+def handle_500(e):
+    return jsonify({'success': False, 'error': 'Internal server error'}), 500
