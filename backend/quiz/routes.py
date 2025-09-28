@@ -62,47 +62,42 @@ def upload_and_generate():
         file = request.files.get("file")
         if not file:
             return jsonify({"success": False, "error": "File is required"}), 400
-
         filename = file.filename.lower()
         ext = os.path.splitext(filename)[1]
         stream = io.BytesIO(file.read())
-
         if ext == ".pdf":
             text = read_pdf(stream)
         elif ext == ".txt":
             text = read_txt(stream)
         else:
             return jsonify({"success": False, "error": "Unsupported file type. Use PDF or TXT."}), 400
-
-        if not text.strip():
-            return jsonify({"success": False, "error": "Uploaded file contained no extractable text."}), 400
-
+        if not text or not text.strip() or len(text.strip()) < 20:
+            return jsonify({"success": False, "error": "No extractable text found in uploaded file."}), 400
         num_questions = int(request.form.get("numq", 5))
         difficulty = request.form.get("difficulty", "mixed")
-
-        # Clamp text length (limit parameter, not max_tokens)
         text = clamp(text, limit=12000)
-
         prompt = build_mcq_prompt(text, num_questions, difficulty)
         response = client.models.generate_content(
             model="gemini-2.0-flash-exp",
             contents=prompt
         )
-        quiz_data = json.loads(response.text)
-
+        if not hasattr(response, "text") or not response.text or not response.text.strip():
+            return jsonify({"success": False, "error": "Quiz generator failed: Model returned no output."}), 500
+        try:
+            quiz_data = json.loads(response.text)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Quiz AI gave invalid output: {e}"}), 500
         normalized_quiz = []
-        for i, item in enumerate(quiz_data):
-            normalized_item = {
-                "question": item["question"],
-                "options": item["options"],
-                "answerIndex": ord(item["answer"]) - ord("A"),
-                "answerLetter": item["answer"],
-                "explanation": item["explanation"],
-                "difficulty": item["difficulty"],
-                "topic": item["topic"]
-            }
-            normalized_quiz.append(normalized_item)
-
+        for item in quiz_data:
+            normalized_quiz.append({
+                "question": item.get("question", ""),
+                "options": item.get("options", ["", "", "", ""]),
+                "answerIndex": ord(item.get("answer", "A")) - ord("A"),
+                "answerLetter": item.get("answer", ""),
+                "explanation": item.get("explanation", ""),
+                "difficulty": item.get("difficulty", ""),
+                "topic": item.get("topic", ""),
+            })
         return jsonify({"success": True, "quiz": normalized_quiz})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
