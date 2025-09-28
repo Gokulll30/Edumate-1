@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useState, useRef } from 'react';
 import { Upload, FileText, Brain, Clock, CheckCircle, XCircle, BarChart, Trophy } from 'lucide-react';
 import { uploadFile, checkAnswer, saveQuizResult } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +22,7 @@ interface Feedback {
 
 export default function QuizGenerator() {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [quiz, setQuiz] = useState<Question[]>([]);
@@ -37,25 +37,15 @@ export default function QuizGenerator() {
   const [startTime, setStartTime] = useState<number>(0);
   const [quizSaved, setQuizSaved] = useState(false);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const uploadedFile = acceptedFiles[0];
-    if (uploadedFile) {
-      setFile(uploadedFile);
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
     }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'text/plain': ['.txt']
-    },
-    multiple: false
-  });
+  };
 
   const generateQuiz = async () => {
     if (!file) return;
-
     setUploading(true);
     try {
       const formData = new FormData();
@@ -73,7 +63,7 @@ export default function QuizGenerator() {
         setCompleted(false);
         setShowAnswer(false);
         setQuizSaved(false);
-        setStartTime(Date.now()); // Start timer
+        setStartTime(Date.now());
       } else {
         alert('Error generating quiz: ' + result.error);
       }
@@ -85,25 +75,21 @@ export default function QuizGenerator() {
   };
 
   const handleAnswerSelect = (answerIndex: number) => {
-    setSelectedAnswer(answerIndex);
+    if (!showAnswer) setSelectedAnswer(answerIndex);
   };
 
   const submitAnswer = async () => {
     if (selectedAnswer === null) return;
-
     try {
       const result = await checkAnswer({
         quiz,
         questionIndex: currentQuestion,
         selectedIndex: selectedAnswer
       });
-
       if (result.success) {
         setFeedback(result);
         setShowAnswer(true);
-        if (result.correct) {
-          setScore(score + 1);
-        }
+        if (result.correct) setScore(prev => prev + 1);
       }
     } catch (error) {
       alert('Failed to check answer');
@@ -112,7 +98,7 @@ export default function QuizGenerator() {
 
   const nextQuestion = () => {
     if (currentQuestion < quiz.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
+      setCurrentQuestion(prev => prev + 1);
       setSelectedAnswer(null);
       setFeedback(null);
       setShowAnswer(false);
@@ -124,22 +110,19 @@ export default function QuizGenerator() {
 
   const saveQuizScore = async () => {
     if (!user?.username || quizSaved) return;
-
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-    const currentTopic = quiz.length > 0 ? quiz[0].topic : 'General';
-
     try {
       await saveQuizResult({
         username: user.username,
-        score: score + (feedback?.correct ? 1 : 0), // Include current question if correct
+        score,
         total_questions: quiz.length,
-        topic: currentTopic,
-        difficulty: difficulty,
+        topic: quiz.length > 0 ? quiz[0].topic : 'General',
+        difficulty,
         time_taken: timeSpent
       });
       setQuizSaved(true);
     } catch (error) {
-      console.error('Failed to save quiz result:', error);
+      console.error('Failed to save quiz result');
     }
   };
 
@@ -153,12 +136,15 @@ export default function QuizGenerator() {
     setCompleted(false);
     setShowAnswer(false);
     setQuizSaved(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${minutes}m ${secs}s`;
+    return `${mins}m ${secs}s`;
   };
 
   const getScoreColor = (percentage: number) => {
@@ -183,15 +169,14 @@ export default function QuizGenerator() {
         {!quiz.length && !completed && (
           <div className="space-y-6">
             {/* File Upload */}
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-gray-600 hover:border-blue-500'
-              }`}
-            >
-              <input {...getInputProps()} />
+            <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
               <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               {file ? (
                 <div className="flex items-center justify-center space-x-2">
@@ -200,10 +185,13 @@ export default function QuizGenerator() {
                 </div>
               ) : (
                 <div>
-                  <p className="text-lg mb-2">
-                    {isDragActive ? 'Drop the file here' : 'Drag & drop a file here'}
-                  </p>
-                  <p className="text-gray-500">or click to select a PDF or TXT file</p>
+                  <p className="text-lg mb-2">Upload File (PDF or Text)</p>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Choose File
+                  </button>
                 </div>
               )}
             </div>
@@ -211,9 +199,7 @@ export default function QuizGenerator() {
             {/* Quiz Configuration */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Number of Questions
-                </label>
+                <label className="block text-sm font-medium mb-2">Number of Questions</label>
                 <select
                   value={numQuestions}
                   onChange={(e) => setNumQuestions(Number(e.target.value))}
@@ -227,9 +213,7 @@ export default function QuizGenerator() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Difficulty Level
-                </label>
+                <label className="block text-sm font-medium mb-2">Difficulty Level</label>
                 <select
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value)}
@@ -265,7 +249,7 @@ export default function QuizGenerator() {
 
         {quiz.length > 0 && !completed && (
           <div className="space-y-6">
-            {/* Progress Bar */}
+            {/* Progress and Score */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-400">
