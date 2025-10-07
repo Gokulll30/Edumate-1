@@ -10,6 +10,7 @@ import {
   Award,
   CheckCircle2,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 type Stat = {
   label: string;
@@ -26,15 +27,21 @@ type Activity =
   | { type: "chat"; title: string; messages: number; time: string };
 
 type Task = {
+  id?: number; // add id for delete/rename if needed
   title: string;
-  due: string;
+  due: string; // formatted due date string for display
   priority: "high" | "medium" | "low";
+  subject?: string;
+  isRetake?: boolean;
+  rawDate?: string;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
   const [selectedTimeframe, setSelectedTimeframe] = useState("week");
   const [progress, setProgress] = useState({
     totalSessions: 0,
@@ -44,6 +51,9 @@ export default function Dashboard() {
     testsTaken: 0,
     completionRate: 0,
   });
+
+  // New state for upcoming tasks fetched from backend
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
   // Query backend user progress on load/login
   useEffect(() => {
@@ -80,6 +90,54 @@ export default function Dashboard() {
     fetchProgress();
   }, [user]);
 
+  // Fetch upcoming tasks/study sessions dynamically (including retake quizzes)
+  useEffect(() => {
+    async function fetchUpcomingTasks() {
+      if (!user) return;
+      try {
+        const res = await fetch(`${API_BASE}/study/sessions/${encodeURIComponent(user.id)}`);
+        const tasksData = await res.json();
+        if (tasksData?.success && Array.isArray(tasksData.sessions)) {
+          // Filter to only future/completed=0 sessions
+          const now = new Date();
+          const filtered = tasksData.sessions
+            .filter((session: any) => {
+              const sessionDate = session.date ? new Date(session.date) : null;
+              return (
+                session.completed === 0 &&
+                sessionDate !== null &&
+                sessionDate >= now
+              );
+            })
+            // Sort ascending by date
+            .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+            .map((session: any) => ({
+              id: session.id,
+              title: session.title,
+              due: session.date
+                ? new Date(session.date).toLocaleDateString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "No Date",
+              priority: session.priority || "medium",
+              subject: session.subject,
+              isRetake: session.type === "quiz_retake",
+              rawDate: session.date,
+            }));
+          setUpcomingTasks(filtered);
+        } else {
+          setUpcomingTasks([]);
+        }
+      } catch {
+        setUpcomingTasks([]);
+      }
+    }
+    fetchUpcomingTasks();
+  }, [user, progress]);
+
   // User is new if all DB progress stats are zero
   const isNewUser =
     progress.totalSessions === 0 &&
@@ -89,7 +147,7 @@ export default function Dashboard() {
     progress.testsTaken === 0 &&
     progress.completionRate === 0;
 
-  // Recent activity from database. If new user, show none.
+  // Same Recent Activity and stats as before (unchanged)
   const recentActivity: Activity[] = isNewUser
     ? []
     : [
@@ -112,32 +170,6 @@ export default function Dashboard() {
           time: "1 day ago",
         },
         { type: "chat", title: "AI Study Session", messages: 12, time: "1 day ago" },
-      ];
-
-  // Tasks - show none for new user
-  const upcomingTasks: Task[] = isNewUser
-    ? []
-    : [
-        {
-          title: "Operating Systems Quiz",
-          due: "Today, 3:00 PM",
-          priority: "high",
-        },
-        {
-          title: "Database Design Project",
-          due: "Tomorrow, 11:59 PM",
-          priority: "medium",
-        },
-        {
-          title: "Review Machine Learning Notes",
-          due: "Friday, 2:00 PM",
-          priority: "low",
-        },
-        {
-          title: "Prepare for Data Structures Exam",
-          due: "Next Monday",
-          priority: "high",
-        },
       ];
 
   // Stat widgets for top row
@@ -218,6 +250,25 @@ export default function Dashboard() {
     return icons[type as keyof typeof icons] || BookOpen;
   };
 
+  // Function to handle clicking on task
+  const onTaskClick = (task: Task) => {
+    if (task.isRetake && task.subject) {
+      // Navigate to QuizGenerator with subject query param
+      navigate(`/quiz-generator?subject=${encodeURIComponent(task.subject)}`);
+    }
+    // Otherwise, could handle other task types if required
+  };
+
+  // Helper to check if retake test is within 2 days from now
+  const showRetakeMessage = (task: Task): boolean => {
+    if (!task.isRetake || !task.rawDate) return false;
+    const now = new Date();
+    const dueDate = new Date(task.rawDate);
+    const diffMs = dueDate.getTime() - now.getTime();
+    const diffDays = diffMs / (1000 * 3600 * 24);
+    return diffDays >= 0 && diffDays <= 2;
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
       <Navigation />
@@ -295,6 +346,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+
           {/* Upcoming Tasks */}
           <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-6">Upcoming Tasks</h3>
@@ -304,20 +356,26 @@ export default function Dashboard() {
             <div className="space-y-4">
               {upcomingTasks.map((task, index) => (
                 <div
-                  key={index}
-                  className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-slate-600 transition-all"
+                  key={task.id || index}
+                  onClick={() => onTaskClick(task)}
+                  className="cursor-pointer flex flex-col p-4 bg-slate-700/50 rounded-lg border border-slate-600 transition-all hover:bg-slate-600 duration-300"
                 >
-                  <div className="flex-1">
-                    <h4 className="text-white font-medium mb-1">{task.title}</h4>
-                    <p className="text-slate-400 text-sm">{task.due}</p>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-white font-medium">{task.title}</h4>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(
+                        task.priority
+                      )}`}
+                    >
+                      {task.priority}
+                    </span>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(
-                      task.priority
-                    )}`}
-                  >
-                    {task.priority}
-                  </span>
+                  <p className="text-slate-400 text-sm">{task.due}</p>
+                  {showRetakeMessage(task) && (
+                    <p className="mt-2 text-yellow-300 text-sm italic">
+                      You have the rescheduled test on {task.due}. In the meantime, prepare well to improve your score.
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

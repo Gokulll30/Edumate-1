@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Brain, Clock, CheckCircle, XCircle, BarChart, Trophy } from 'lucide-react';
 import { uploadFile, checkAnswer, saveQuizResult } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 interface Question {
   question: string;
@@ -20,6 +21,10 @@ interface Feedback {
   explanation: string;
 }
 
+function useQuery() {
+  return new URLSearchParams(useLocation().search);
+}
+
 export default function QuizGenerator() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +41,19 @@ export default function QuizGenerator() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [startTime, setStartTime] = useState<number>(0);
   const [quizSaved, setQuizSaved] = useState(false);
+  const [preselectedSubject, setPreselectedSubject] = useState<string | null>(null);
 
+  const query = useQuery();
+  const subjectFromUrl = query.get('subject');
+
+  useEffect(() => {
+    if (subjectFromUrl) {
+      setPreselectedSubject(subjectFromUrl);
+      setDifficulty('mixed'); // Optional, can be improved further
+    }
+  }, [subjectFromUrl]);
+
+  // Handles file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
@@ -44,6 +61,7 @@ export default function QuizGenerator() {
     }
   };
 
+  // Generate quiz from uploaded file
   const generateQuiz = async () => {
     if (!file) return;
     setUploading(true);
@@ -64,6 +82,7 @@ export default function QuizGenerator() {
         setShowAnswer(false);
         setQuizSaved(false);
         setStartTime(Date.now());
+        setPreselectedSubject(null); // Clear preselected after quiz is generated
       } else {
         alert('Error generating quiz: ' + result.error);
       }
@@ -74,10 +93,12 @@ export default function QuizGenerator() {
     }
   };
 
+  // Handle answer selection
   const handleAnswerSelect = (answerIndex: number) => {
     if (!showAnswer) setSelectedAnswer(answerIndex);
   };
 
+  // Submit current answer
   const submitAnswer = async () => {
     if (selectedAnswer === null) return;
     try {
@@ -91,11 +112,12 @@ export default function QuizGenerator() {
         setShowAnswer(true);
         if (result.correct) setScore(prev => prev + 1);
       }
-    } catch (error) {
+    } catch {
       alert('Failed to check answer');
     }
   };
 
+  // Move to next question or finish quiz
   const nextQuestion = () => {
     if (currentQuestion < quiz.length - 1) {
       setCurrentQuestion(prev => prev + 1);
@@ -108,6 +130,7 @@ export default function QuizGenerator() {
     }
   };
 
+  // Save quiz result with preselected subject if present
   const saveQuizScore = async () => {
     if (!user?.username || quizSaved) return;
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
@@ -116,16 +139,17 @@ export default function QuizGenerator() {
         username: user.username,
         score,
         total_questions: quiz.length,
-        topic: quiz.length > 0 ? quiz[0].topic : 'General',
+        topic: quiz.length > 0 ? quiz[0].topic : (preselectedSubject || 'General'),
         difficulty,
         time_taken: timeSpent
       });
       setQuizSaved(true);
-    } catch (error) {
+    } catch {
       console.error('Failed to save quiz result');
     }
   };
 
+  // Reset quiz state
   const resetQuiz = () => {
     setFile(null);
     setQuiz([]);
@@ -136,17 +160,20 @@ export default function QuizGenerator() {
     setCompleted(false);
     setShowAnswer(false);
     setQuizSaved(false);
+    setPreselectedSubject(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
+  // Format time for display
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
   };
 
+  // Get color style for score percentage
   const getScoreColor = (percentage: number) => {
     if (percentage >= 90) return 'text-green-500';
     if (percentage >= 75) return 'text-blue-500';
@@ -162,6 +189,12 @@ export default function QuizGenerator() {
           <h1 className="text-3xl font-bold">AI Quiz Generator</h1>
         </div>
         
+        {preselectedSubject && (
+          <p className="text-yellow-400 mb-4">
+            Preselected Subject: <strong>{preselectedSubject}</strong>
+          </p>
+        )}
+
         <p className="text-gray-400 mb-8">
           Upload study materials and generate personalized quizzes using AI
         </p>

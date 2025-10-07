@@ -9,13 +9,16 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from typing import Optional, Dict, List, Any
 from flask import g, current_app
 
+
 DB_CONN = None
 DB_PATH = None
+
 
 # IST time helper (India Standard Time, UTC+05:30)
 def _now_ist_iso():
     ist = timezone(timedelta(hours=5, minutes=30))
     return datetime.now(ist).isoformat()
+
 
 def get_db_connection():
     """Get database connection with proper Flask context handling"""
@@ -24,6 +27,7 @@ def get_db_connection():
         g.db = sqlite3.connect(db_path)
         g.db.row_factory = sqlite3.Row
     return g.db
+
 
 def _ensure_tables(conn: sqlite3.Connection):
     """Create all required tables"""
@@ -134,7 +138,7 @@ def _ensure_tables(conn: sqlite3.Connection):
             total_questions INTEGER NOT NULL,
             percentage INTEGER NOT NULL,
             time_taken INTEGER NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
@@ -155,6 +159,7 @@ def _ensure_tables(conn: sqlite3.Connection):
     """)
     
     conn.commit()
+
 
 def _migrate_db_schema(conn: sqlite3.Connection):
     """Ensure schema changes for older DBs"""
@@ -198,6 +203,7 @@ def _migrate_db_schema(conn: sqlite3.Connection):
         print(f"Migration error: {e}")
         pass
 
+
 def init_db(path: Optional[str] = None):
     """Initialize database with all tables"""
     global DB_PATH, DB_CONN
@@ -220,6 +226,7 @@ def init_db(path: Optional[str] = None):
     
     return conn
 
+
 def get_conn():
     """Get connection (fallback to global connection)"""
     global DB_CONN, DB_PATH
@@ -227,7 +234,9 @@ def get_conn():
         return DB_CONN
     return init_db(DB_PATH)
 
+
 # ===== USER/AUTH FUNCTIONS =====
+
 
 def create_user(username: str, email: str, password_hash: str) -> int:
     """Create a new user - Updated for auth integration"""
@@ -256,6 +265,7 @@ def create_user(username: str, email: str, password_hash: str) -> int:
     conn.commit()
     return user_id
 
+
 def get_user_by_username(username: str) -> Optional[Dict]:
     """Get user by username - Updated for auth integration"""
     try:
@@ -269,6 +279,7 @@ def get_user_by_username(username: str) -> Optional[Dict]:
     """, (username,)).fetchone()
     
     return dict(row) if row else None
+
 
 def verify_user(username: str, password_plain: str) -> Dict:
     """Verify user credentials"""
@@ -291,7 +302,9 @@ def verify_user(username: str, password_plain: str) -> Dict:
         }
     }
 
+
 # ===== CHAT SESSION FUNCTIONS =====
+
 
 def get_chat_sessions(user_id: int) -> List[Dict]:
     """Get all chat sessions for a user"""
@@ -310,6 +323,7 @@ def get_chat_sessions(user_id: int) -> List[Dict]:
     
     return [dict(session) for session in sessions]
 
+
 def create_chat_session(user_id: int, title: str = "New Chat") -> int:
     """Create a new chat session"""
     try:
@@ -324,6 +338,7 @@ def create_chat_session(user_id: int, title: str = "New Chat") -> int:
     session_id = cursor.lastrowid
     conn.commit()
     return session_id
+
 
 def delete_chat_session(session_id: int, user_id: int) -> bool:
     """Delete a chat session and all its messages"""
@@ -342,6 +357,7 @@ def delete_chat_session(session_id: int, user_id: int) -> bool:
     conn.commit()
     return affected_rows > 0
 
+
 def rename_chat_session(session_id: int, new_title: str, user_id: int) -> bool:
     """Rename a chat session"""
     try:
@@ -357,6 +373,7 @@ def rename_chat_session(session_id: int, new_title: str, user_id: int) -> bool:
     conn.commit()
     return affected_rows > 0
 
+
 def save_chat_message(user_id: int, role: str, message: str, session_id: int = None):
     import datetime
     now = datetime.datetime.now().isoformat()
@@ -369,6 +386,7 @@ def save_chat_message(user_id: int, role: str, message: str, session_id: int = N
         (user_id, role, message, session_id, now)
     )
     conn.commit()
+
 
 def get_chat_history(user_id: int, limit: int = 50, session_id: int = None) -> List[Dict]:
     """Get chat history for a user"""
@@ -394,7 +412,9 @@ def get_chat_history(user_id: int, limit: int = 50, session_id: int = None) -> L
     
     return [dict(msg) for msg in messages]
 
+
 # ===== QUIZ PERFORMANCE FUNCTIONS =====
+
 
 def save_quiz_attempt(user_id: int, topic: str, difficulty: str, score: int, total_questions: int, time_taken: int, username: str = None) -> int:
     """Save a quiz attempt for performance tracking"""
@@ -413,7 +433,16 @@ def save_quiz_attempt(user_id: int, topic: str, difficulty: str, score: int, tot
     
     attempt_id = cursor.lastrowid
     conn.commit()
+
+    # Fetch taken_at for this attempt
+    row = conn.execute("SELECT taken_at FROM quiz_attempts WHERE id = ?", (attempt_id,)).fetchone()
+    if row:
+        taken_at = row['taken_at']
+        # Schedule retake if score <= half
+        schedule_quiz_retake_if_needed(user_id, topic, taken_at, score, total_questions)
+
     return attempt_id
+
 
 def get_quiz_history(user_id: int, limit: int = 50) -> List[Dict]:
     """Get quiz history for performance tracking"""
@@ -423,14 +452,15 @@ def get_quiz_history(user_id: int, limit: int = 50) -> List[Dict]:
         conn = get_conn()
     
     attempts = conn.execute("""
-        SELECT id, topic, difficulty, score, total_questions, percentage, time_taken, created_at
+        SELECT id, topic, difficulty, score, total_questions, percentage, time_taken, taken_at 
         FROM quiz_attempts 
         WHERE user_id = ? 
-        ORDER BY created_at DESC 
+        ORDER BY taken_at DESC 
         LIMIT ?
     """, (user_id, limit)).fetchall()
     
     return [dict(attempt) for attempt in attempts]
+
 
 def get_quiz_stats(user_id: int) -> Dict:
     """Get quiz statistics for performance tracking"""
@@ -444,7 +474,7 @@ def get_quiz_stats(user_id: int) -> Dict:
             COUNT(*) as total_attempts,
             AVG(percentage) as avg_percentage,
             MAX(percentage) as best_score,
-            MAX(created_at) as last_attempt
+            MAX(taken_at) as last_attempt
         FROM quiz_attempts 
         WHERE user_id = ?
     """, (user_id,)).fetchone()
@@ -464,7 +494,9 @@ def get_quiz_stats(user_id: int) -> Dict:
             'last_attempt': None
         }
 
+
 # ===== EXISTING QUIZ FUNCTIONS (Keep for compatibility) =====
+
 
 def save_quiz_attempt_legacy(user_id: int, user_name: str, subject: str, difficulty: str, num_questions: int, score: float, qnas: list) -> int:
     """Legacy quiz attempt saving - keep for backward compatibility"""
@@ -473,7 +505,7 @@ def save_quiz_attempt_legacy(user_id: int, user_name: str, subject: str, difficu
     taken_at = _now_ist_iso()
     
     cur.execute("""
-        INSERT INTO quiz_attempts (user_id, username, topic, difficulty, total_questions, score, created_at)
+        INSERT INTO quiz_attempts (user_id, username, topic, difficulty, total_questions, score, taken_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (user_id, user_name, subject, difficulty, num_questions, score, taken_at))
     
@@ -497,7 +529,9 @@ def save_quiz_attempt_legacy(user_id: int, user_name: str, subject: str, difficu
     conn.commit()
     return attempt_id
 
+
 # ===== LOGIN SESSION TRACKING =====
+
 
 def log_login(user_id: int) -> int:
     """Log a login session"""
@@ -508,6 +542,7 @@ def log_login(user_id: int) -> int:
     cur.execute("INSERT INTO login_sessions (user_id, login_at) VALUES (?, ?)", (user_id, login_at))
     conn.commit()
     return cur.lastrowid
+
 
 def log_logout(session_id: int):
     """Log logout for a session"""
@@ -531,7 +566,9 @@ def log_logout(session_id: int):
     
     conn.commit()
 
+
 # ===== STUDY SESSION FUNCTIONS (Keep existing) =====
+
 
 def add_study_session(user_id: int, title: str, subject: str, duration: int, date: str, time: str, type_: str, priority: str, notes: Optional[str] = None) -> Dict:
     """Add a study session"""
@@ -548,11 +585,13 @@ def add_study_session(user_id: int, title: str, subject: str, duration: int, dat
     row = cur.execute("SELECT * FROM study_sessions WHERE id = ?", (cur.lastrowid,)).fetchone()
     return dict(row)
 
+
 def get_study_sessions(user_id: int) -> List[Dict]:
     """Get all study sessions for a user"""
     conn = get_conn()
     rows = conn.execute("SELECT * FROM study_sessions WHERE user_id = ? ORDER BY date, time", (user_id,)).fetchall()
     return [dict(r) for r in rows]
+
 
 def delete_study_session(session_id: int, user_id: int) -> bool:
     """Delete a study session"""
@@ -561,6 +600,7 @@ def delete_study_session(session_id: int, user_id: int) -> bool:
     cur.execute("DELETE FROM study_sessions WHERE id = ? AND user_id = ?", (session_id, user_id))
     conn.commit()
     return cur.rowcount > 0
+
 
 def toggle_study_completion(session_id: int, user_id: int) -> Optional[Dict]:
     """Toggle completion status of a study session"""
@@ -576,6 +616,7 @@ def toggle_study_completion(session_id: int, user_id: int) -> Optional[Dict]:
     conn.commit()
     
     return dict(cur.execute("SELECT * FROM study_sessions WHERE id = ?", (session_id,)).fetchone())
+
 
 def compute_progress(user_id: int) -> Dict[str, Any]:
     """Compute progress statistics for a user"""
@@ -602,6 +643,60 @@ def compute_progress(user_id: int) -> Dict[str, Any]:
         "testsTaken": int(tests_taken),
         "completionRate": int(round(completion_rate))
     }
+
+
+# ===== New scheduling helper function =====
+
+def schedule_quiz_retake_if_needed(user_id: int, subject: str, taken_at: str, score: int, total_questions: int):
+    """Schedule retake session 2 days after taken_at if score <= half the total. Avoid duplicates."""
+    if total_questions == 0:
+        return  # Avoid division by zero
+
+    if score > total_questions // 2:
+        return  # No need to schedule retake if score more than half
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        # Calculate retake date 2 days after taken_at
+        taken_date = datetime.fromisoformat(taken_at)
+        retake_date = taken_date + timedelta(days=2)
+        retake_date_str = retake_date.date().isoformat()  # Store only date part
+
+        # Check if already a study session scheduled for this user with same subject and date and not completed
+        existing = cur.execute("""
+            SELECT id FROM study_sessions 
+            WHERE user_id = ? AND subject = ? AND date = ? AND completed = 0
+        """, (user_id, subject, retake_date_str)).fetchone()
+
+        if existing:
+            return  # Already scheduled
+
+        # Insert a study session as retake test reminder
+        title = f"Retake Quiz: {subject}"
+        cur.execute("""
+            INSERT INTO study_sessions 
+            (user_id, title, subject, duration, date, time, type, priority, completed, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            title,
+            subject,
+            60,  # default duration 60 mins
+            retake_date_str,
+            None,  # no specific time
+            'quiz_retake',
+            'high',
+            0,  # not completed
+            'You scored less than half. Prepare well for retake.',
+            _now_ist_iso()
+        ))
+        conn.commit()
+    except Exception as e:
+        print(f"Error scheduling quiz retake: {e}")
+        pass
+
 
 # Initialize database on import
 try:
