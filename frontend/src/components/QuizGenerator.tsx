@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Brain, Clock, CheckCircle, XCircle, BarChart, Trophy } from 'lucide-react';
-import { uploadFile, checkAnswer, saveQuizResult } from '../services/api';
+import { uploadFile, checkAnswer, saveQuizResultWithAnswers } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 
@@ -46,14 +46,22 @@ export default function QuizGenerator() {
   const query = useQuery();
   const subjectFromUrl = query.get('subject');
 
+  // Array to store user's answers as they click
+  const [userAnswers, setUserAnswers] = useState<Array<number | null>>([]);
+
   useEffect(() => {
     if (subjectFromUrl) {
       setPreselectedSubject(subjectFromUrl);
-      setDifficulty('mixed'); // Optional, can be improved further
+      setDifficulty('mixed');
     }
   }, [subjectFromUrl]);
 
-  // Handles file selection
+  // When quiz is generated, reset answers
+  useEffect(() => {
+    // Set default userAnswers
+    setUserAnswers(Array(quiz.length).fill(null));
+  }, [quiz.length]);
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
@@ -61,7 +69,6 @@ export default function QuizGenerator() {
     }
   };
 
-  // Generate quiz from uploaded file
   const generateQuiz = async () => {
     if (!file) return;
     setUploading(true);
@@ -82,7 +89,8 @@ export default function QuizGenerator() {
         setShowAnswer(false);
         setQuizSaved(false);
         setStartTime(Date.now());
-        setPreselectedSubject(null); // Clear preselected after quiz is generated
+        setPreselectedSubject(null);
+        setUserAnswers(Array(result.quiz.length).fill(null));
       } else {
         alert('Error generating quiz: ' + result.error);
       }
@@ -93,12 +101,10 @@ export default function QuizGenerator() {
     }
   };
 
-  // Handle answer selection
   const handleAnswerSelect = (answerIndex: number) => {
     if (!showAnswer) setSelectedAnswer(answerIndex);
   };
 
-  // Submit current answer
   const submitAnswer = async () => {
     if (selectedAnswer === null) return;
     try {
@@ -110,6 +116,12 @@ export default function QuizGenerator() {
       if (result.success) {
         setFeedback(result);
         setShowAnswer(true);
+        // Save user answer for this question
+        setUserAnswers((prev) => {
+          const newAnswers = [...prev];
+          newAnswers[currentQuestion] = selectedAnswer;
+          return newAnswers;
+        });
         if (result.correct) setScore(prev => prev + 1);
       }
     } catch {
@@ -117,11 +129,10 @@ export default function QuizGenerator() {
     }
   };
 
-  // Move to next question or finish quiz
   const nextQuestion = () => {
     if (currentQuestion < quiz.length - 1) {
       setCurrentQuestion(prev => prev + 1);
-      setSelectedAnswer(null);
+      setSelectedAnswer(userAnswers[currentQuestion + 1] ?? null);
       setFeedback(null);
       setShowAnswer(false);
     } else {
@@ -130,18 +141,32 @@ export default function QuizGenerator() {
     }
   };
 
-  // Save quiz result with preselected subject if present
+  // Save with all user's answers after quiz complete
   const saveQuizScore = async () => {
     if (!user?.username || quizSaved) return;
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+
+    // For each question, get user answer from userAnswers array
+    const qnas = quiz.map((q, idx) => {
+      const userAnswerIndex = userAnswers[idx];
+      return {
+        question: q.question,
+        correct_answer: q.options[q.answerIndex],
+        user_answer: userAnswerIndex !== null ? q.options[userAnswerIndex] : '', 
+        is_correct: userAnswerIndex === q.answerIndex,
+        explanation: q.explanation || ''
+      };
+    });
+
     try {
-      await saveQuizResult({
+      await saveQuizResultWithAnswers({
         username: user.username,
         score,
         total_questions: quiz.length,
         topic: quiz.length > 0 ? quiz[0].topic : (preselectedSubject || 'General'),
         difficulty,
-        time_taken: timeSpent
+        time_taken: timeSpent,
+        qnas
       });
       setQuizSaved(true);
     } catch {
@@ -149,7 +174,6 @@ export default function QuizGenerator() {
     }
   };
 
-  // Reset quiz state
   const resetQuiz = () => {
     setFile(null);
     setQuiz([]);
@@ -161,19 +185,18 @@ export default function QuizGenerator() {
     setShowAnswer(false);
     setQuizSaved(false);
     setPreselectedSubject(null);
+    setUserAnswers([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  // Format time for display
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
   };
 
-  // Get color style for score percentage
   const getScoreColor = (percentage: number) => {
     if (percentage >= 90) return 'text-green-500';
     if (percentage >= 75) return 'text-blue-500';
@@ -201,7 +224,6 @@ export default function QuizGenerator() {
 
         {!quiz.length && !completed && (
           <div className="space-y-6">
-            {/* File Upload */}
             <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
               <input
                 ref={fileInputRef}
@@ -228,8 +250,6 @@ export default function QuizGenerator() {
                 </div>
               )}
             </div>
-
-            {/* Quiz Configuration */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Number of Questions</label>
@@ -244,7 +264,6 @@ export default function QuizGenerator() {
                   <option value={15}>15 Questions</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-2">Difficulty Level</label>
                 <select
@@ -259,7 +278,6 @@ export default function QuizGenerator() {
                 </select>
               </div>
             </div>
-
             <button
               onClick={generateQuiz}
               disabled={!file || uploading}
@@ -282,7 +300,6 @@ export default function QuizGenerator() {
 
         {quiz.length > 0 && !completed && (
           <div className="space-y-6">
-            {/* Progress and Score */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-400">
@@ -298,20 +315,16 @@ export default function QuizGenerator() {
                 <span>Topic: {quiz[currentQuestion].topic}</span>
               </div>
             </div>
-
             <div className="w-full bg-gray-700 rounded-full h-2 mb-6">
               <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${((currentQuestion + 1) / quiz.length) * 100}%` }}
               ></div>
             </div>
-
-            {/* Question */}
             <div className="bg-gray-800 p-6 rounded-lg">
               <h2 className="text-xl font-medium mb-4">
                 {quiz[currentQuestion].question}
               </h2>
-
               <div className="space-y-3">
                 {quiz[currentQuestion].options.map((option, index) => (
                   <button
@@ -344,8 +357,6 @@ export default function QuizGenerator() {
                 ))}
               </div>
             </div>
-
-            {/* Action Buttons */}
             <div className="flex justify-between">
               {!showAnswer ? (
                 <button
@@ -364,8 +375,6 @@ export default function QuizGenerator() {
                 </button>
               )}
             </div>
-
-            {/* Feedback */}
             {feedback && showAnswer && (
               <div className={`p-4 rounded-lg ${
                 feedback.correct ? 'bg-green-500/20 border border-green-500' : 'bg-red-500/20 border border-red-500'
@@ -389,13 +398,11 @@ export default function QuizGenerator() {
           </div>
         )}
 
-        {/* Quiz Completion */}
         {completed && (
           <div className="text-center space-y-6">
             <div className="bg-gray-800 p-8 rounded-lg">
               <Trophy className="mx-auto h-16 w-16 text-yellow-500 mb-4" />
               <h2 className="text-2xl font-bold mb-4">Quiz Completed!</h2>
-              
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-blue-500">{score}</div>
@@ -414,13 +421,11 @@ export default function QuizGenerator() {
                   <div className="text-sm text-gray-400">Time Taken</div>
                 </div>
               </div>
-
               <p className="text-gray-400 mb-6">
                 You scored {score} out of {quiz.length} questions correctly!
                 {quizSaved && <span className="block mt-2 text-green-400">✅ Results saved to your profile</span>}
               </p>
             </div>
-
             <div className="flex space-x-4 justify-center">
               <button
                 onClick={resetQuiz}

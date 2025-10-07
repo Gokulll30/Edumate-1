@@ -33,6 +33,19 @@ export interface QuizResult {
   time_taken?: number;
 }
 
+// For full result with answers
+export interface QuizQnA {
+  question: string;
+  correct_answer: string;
+  user_answer: string;
+  is_correct: boolean;
+  explanation: string;
+}
+
+export interface SaveQuizResultWithAnswersRequest extends QuizResult {
+  qnas: QuizQnA[];
+}
+
 export interface QuizAttempt {
   id: number;
   score: number;
@@ -329,7 +342,7 @@ export async function checkAnswer(data: {
   }
 }
 
-// Save quiz result (with authentication)
+// Save quiz result (old version, still exported for compatibility)
 export async function saveQuizResult(result: QuizResult): Promise<{
   success: boolean;
   percentage?: number;
@@ -350,6 +363,34 @@ export async function saveQuizResult(result: QuizResult): Promise<{
     return await response.json();
   } catch (error) {
     console.error("Save quiz result error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Save failed'
+    };
+  }
+}
+
+// ===== NEW: Save Quiz Result WITH Answers (needed by QuizGenerator.tsx) =====
+export async function saveQuizResultWithAnswers(payload: SaveQuizResultWithAnswersRequest): Promise<{
+  success: boolean;
+  percentage?: number;
+  error?: string;
+}> {
+  try {
+    const response = await fetch(`${API_BASE}/quiz/save-result`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Save quiz result (with answers) error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Save failed'
@@ -459,7 +500,6 @@ export const getLeaderboard = async (): Promise<{ success: boolean; leaderboard:
 
 // ===== CHAT API =====
 
-// Send chat message
 export const sendChatMessage = async (message: string, sessionId?: number, fileText?: string): Promise<{
   success: boolean;
   reply?: string;
@@ -491,7 +531,6 @@ export const sendChatMessage = async (message: string, sessionId?: number, fileT
   }
 };
 
-// Get chat history
 export const getChatHistory = async (sessionId?: number, limit: number = 50): Promise<{
   success: boolean;
   history: ChatMessage[];
@@ -523,7 +562,6 @@ export const getChatHistory = async (sessionId?: number, limit: number = 50): Pr
   }
 };
 
-// Get chat sessions
 export const getChatSessions = async (): Promise<{
   success: boolean;
   sessions: ChatSession[];
@@ -552,7 +590,6 @@ export const getChatSessions = async (): Promise<{
   }
 };
 
-// Create new chat session
 export const createChatSession = async (title: string = 'New Chat'): Promise<{
   success: boolean;
   session_id?: number;
@@ -579,7 +616,6 @@ export const createChatSession = async (title: string = 'New Chat'): Promise<{
   }
 };
 
-// Delete chat session
 export const deleteChatSession = async (sessionId: number): Promise<{
   success: boolean;
   error?: string;
@@ -606,7 +642,6 @@ export const deleteChatSession = async (sessionId: number): Promise<{
   }
 };
 
-// Rename chat session
 export const renameChatSession = async (sessionId: number, title: string): Promise<{
   success: boolean;
   error?: string;
@@ -632,7 +667,6 @@ export const renameChatSession = async (sessionId: number, title: string): Promi
   }
 };
 
-// Upload file for chat
 export const uploadChatFile = async (file: File): Promise<{
   success: boolean;
   fileText?: string;
@@ -667,7 +701,6 @@ export const uploadChatFile = async (file: File): Promise<{
 
 // ===== HEALTH CHECK =====
 
-// Health check
 export async function checkHealth(): Promise<{ status: string; service: string }> {
   try {
     const response = await fetch(`${API_BASE}/health`);
@@ -679,12 +712,10 @@ export async function checkHealth(): Promise<{ status: string; service: string }
 
 // ===== UTILITY FUNCTIONS =====
 
-// Check if user is authenticated
 export const isAuthenticated = (): boolean => {
   return !!getAuthToken();
 };
 
-// Get current user from token (without API call)
 export const getCurrentUserFromToken = (): { id: number; username: string } | null => {
   const token = getAuthToken();
   if (!token) return null;
