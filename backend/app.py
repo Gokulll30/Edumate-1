@@ -32,7 +32,7 @@ app = Flask(__name__)
 app.teardown_appcontext(close_db)
 app.config["DATABASE"] = DATABASE
 
-# ✅ FIXED CORS configuration - THIS IS THE MAIN FIX
+# ✅ FIXED CORS configuration
 CORS(
     app,
     origins=[
@@ -41,10 +41,10 @@ CORS(
         "https://*.vercel.app",
         "https://edumate-2026.vercel.app"
     ],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # ✅ Added missing methods
-    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],  # ✅ Added missing headers
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
     supports_credentials=False
-)  # ✅ Fixed missing closing parenthesis
+)
 
 # Initialize database on startup
 def init_database():
@@ -55,7 +55,7 @@ def init_database():
 with app.app_context():
     init_database()
 
-# ✅ Enhanced blueprint registration with better error handling
+# ✅ FIXED blueprint registration with better error handling
 print("\n🔧 Registering blueprints...")
 
 try:
@@ -66,11 +66,13 @@ except Exception as e:
     print(f"❌ Auth blueprint registration failed: {e}")
 
 try:
-    from quiz.routes import quiz_bp
+    from quiz.routes import quiz_bp  # ✅ This should work now
     app.register_blueprint(quiz_bp, url_prefix="/quiz")
     print("✅ Quiz blueprint registered successfully")
 except Exception as e:
     print(f"❌ Quiz blueprint registration failed: {e}")
+    import traceback
+    traceback.print_exc()
 
 try:
     from chat.routes import chat_bp
@@ -86,34 +88,24 @@ try:
 except Exception as e:
     print(f"❌ Study blueprint registration failed: {e}")
 
-# ✅ Enhanced health check with debugging info
+# Health Check Route
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
         "status": "ok", 
         "service": "edumate-backend",
-        "timestamp": "2025-10-14",
-        "cors_origins": [
-            "http://localhost:3000",
-            "http://localhost:5173", 
-            "https://*.vercel.app",
-            "https://edumate-2026.vercel.app"
-        ]
+        "timestamp": "2025-10-14"
     })
 
-# ✅ Test route for quiz debugging
+# Test route for quiz
 @app.route("/test-quiz", methods=["GET"])
 def test_quiz():
     return jsonify({
         "message": "Quiz routes are working",
-        "available_endpoints": [
-            "/quiz/upload",
-            "/quiz/check", 
-            "/quiz/save-result"
-        ]
+        "available_endpoints": ["/quiz/upload", "/quiz/test"]
     })
 
-# ✅ Handle preflight OPTIONS requests explicitly
+# Handle preflight OPTIONS requests
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
@@ -124,22 +116,7 @@ def handle_preflight():
         response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
         return response
 
-# ✅ Fixed frontend serving (removed duplicate route)
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def serve_frontend(path):
-    frontend_dir = os.path.join(APP_DIR, "..", "frontend", "dist")
-    if path and os.path.exists(os.path.join(frontend_dir, path)):
-        return send_from_directory(frontend_dir, path)
-    else:
-        # Fallback to index.html for SPA routing
-        index_path = os.path.join(frontend_dir, "index.html")
-        if os.path.exists(index_path):
-            return send_from_directory(frontend_dir, "index.html")
-        else:
-            return jsonify({"message": "Frontend not built yet"}), 404
-
-# ✅ Enhanced JSON error handlers with debugging
+# Enhanced error handlers
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({
@@ -156,9 +133,7 @@ def method_not_allowed(e):
         "success": False, 
         "error": "Method not allowed",
         "method": request.method,
-        "path": request.path,
-        "allowed_methods": list(e.valid_methods) if hasattr(e, 'valid_methods') else [],
-        "fix": "Check CORS configuration and route methods"
+        "path": request.path
     }), 405
 
 @app.errorhandler(500)
@@ -166,7 +141,7 @@ def internal_error(e):
     print(f"❌ 500 Error: {str(e)}")
     return jsonify({"success": False, "error": "Internal server error"}), 500
 
-# ✅ Enhanced startup logging
+# Enhanced startup logging
 if __name__ == "__main__":
     print("\n" + "="*60)
     print("🚀 EDUMATE BACKEND STARTING")
@@ -176,19 +151,6 @@ if __name__ == "__main__":
     for rule in app.url_map.iter_rules():
         methods = ",".join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
         print(f"   {rule.rule:<40} [{methods}]")
-    
-    print(f"\n🌐 CORS Configuration:")
-    print("   Origins:")
-    print("     • http://localhost:3000")
-    print("     • http://localhost:5173") 
-    print("     • https://*.vercel.app")
-    print("     • https://edumate-2026.vercel.app")
-    print("   Methods: GET, POST, PUT, DELETE, OPTIONS")
-    print("   Headers: Content-Type, Authorization, Accept")
-    
-    print(f"\n🎯 Server Info:")
-    print(f"   Database: {DATABASE}")
-    print(f"   Environment: {'Production' if not os.getenv('DEBUG') else 'Development'}")
     
     port = int(os.getenv("PORT", 5001))
     print(f"\n🌟 Server starting on http://localhost:{port}")
