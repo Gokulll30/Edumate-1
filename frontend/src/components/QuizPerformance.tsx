@@ -10,7 +10,7 @@ interface QuizAttempt {
   total_questions: number;
   percentage: number;
   time_taken: number;
-  created_at: string;
+  created_at: string; // Should map from backend's taken_at
 }
 
 interface QuizStats {
@@ -25,13 +25,10 @@ const QuizPerformance: React.FC = () => {
   const [stats, setStats] = useState<QuizStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  
-  // Get current logged-in user from context
+
   const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    console.log('QuizPerformance - Auth loading:', authLoading, 'User:', user); // Debug log
-    
     if (!authLoading) {
       if (user?.id) {
         fetchPerformanceData();
@@ -40,54 +37,55 @@ const QuizPerformance: React.FC = () => {
         setError('Authentication required. Please log in again.');
       }
     }
+    // eslint-disable-next-line
   }, [user, authLoading]);
-
+  
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
       setError('');
-      
-      console.log('Fetching quiz performance data for user:', user?.id); // Debug log
-      
+
       if (!user?.id) {
         setError('User not logged in');
+        setLoading(false);
         return;
       }
 
       const userId = user.id;
-
       const [historyResponse, statsResponse] = await Promise.all([
-        getQuizHistory(userId),
+        getQuizHistory(userId), 
         getQuizStats(userId)
       ]);
-      
-      console.log('History response:', historyResponse); // Debug log
-      console.log('Stats response:', statsResponse); // Debug log
-      
-      if (historyResponse.success) {
-        setAttempts(historyResponse.data || []);
+
+      // Ensure mapping taken_at -> created_at
+      let attemptsList: QuizAttempt[] = [];
+      if (historyResponse.success && Array.isArray(historyResponse.data)) {
+        attemptsList = historyResponse.data.map((att: any) => ({
+          ...att,
+          created_at: att.taken_at, // Fix: map backend to expected frontend field
+        }));
+        setAttempts(attemptsList);
       } else {
-        console.error('History error:', historyResponse.error);
+        setAttempts([]);
       }
-      
-      if (statsResponse.success) {
-        setStats(statsResponse.data || {
+
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data);
+      } else {
+        setStats({
           total_attempts: 0,
           avg_percentage: 0,
           best_score: 0,
-          last_attempt: ''
+          last_attempt: '',
         });
-      } else {
-        console.error('Stats error:', statsResponse.error);
       }
-      
-      // Only set error if both failed
+
+      // Display error only if both failed
       if (!historyResponse.success && !statsResponse.success) {
         setError('Failed to load performance data. Please try again.');
       }
-      
+
     } catch (err) {
-      console.error('Performance data fetch error:', err);
       setError('Failed to load performance data. Please check your connection and try again.');
     } finally {
       setLoading(false);
@@ -100,7 +98,6 @@ const QuizPerformance: React.FC = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  // Show loading during auth check
   if (authLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -115,7 +112,6 @@ const QuizPerformance: React.FC = () => {
     );
   }
 
-  // Show login message if user not authenticated
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -124,7 +120,7 @@ const QuizPerformance: React.FC = () => {
           <div className="text-6xl mb-4">🔒</div>
           <h2 className="text-xl font-semibold mb-2">Please Log In</h2>
           <p className="text-gray-400 mb-6">You need to be logged in to view your quiz performance.</p>
-          <button 
+          <button
             onClick={() => window.location.href = '/'}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
@@ -161,13 +157,13 @@ const QuizPerformance: React.FC = () => {
           </div>
           <p className="text-red-400 mb-4">{error}</p>
           <div className="space-x-4">
-            <button 
+            <button
               onClick={fetchPerformanceData}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               Try Again
             </button>
-            <button 
+            <button
               onClick={() => window.location.href = '/'}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
@@ -187,8 +183,8 @@ const QuizPerformance: React.FC = () => {
           <div className="text-6xl mb-4">📊</div>
           <h2 className="text-xl font-semibold mb-2">No Quiz Data Yet</h2>
           <p className="text-gray-400 mb-6">Take your first quiz to see your performance statistics!</p>
-          <a 
-            href="/quiz" 
+          <a
+            href="/quiz"
             className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Take a Quiz
@@ -203,7 +199,7 @@ const QuizPerformance: React.FC = () => {
       <h1 className="text-3xl font-bold mb-8 text-center">
         Quiz Performance - {user.name || user.email}
       </h1>
-      
+
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -218,7 +214,6 @@ const QuizPerformance: React.FC = () => {
               </div>
             </div>
           </div>
-          
           <div className="bg-green-900/20 border border-green-500 rounded-lg p-6">
             <div className="flex items-center">
               <div className="p-3 bg-green-600 rounded-lg mr-4">
@@ -230,7 +225,6 @@ const QuizPerformance: React.FC = () => {
               </div>
             </div>
           </div>
-          
           <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-6">
             <div className="flex items-center">
               <div className="p-3 bg-blue-600 rounded-lg mr-4">
@@ -242,7 +236,6 @@ const QuizPerformance: React.FC = () => {
               </div>
             </div>
           </div>
-          
           <div className="bg-orange-900/20 border border-orange-500 rounded-lg p-6">
             <div className="flex items-center">
               <div className="p-3 bg-orange-600 rounded-lg mr-4">
@@ -320,5 +313,4 @@ const QuizPerformance: React.FC = () => {
     </div>
   );
 };
-
 export default QuizPerformance;

@@ -10,10 +10,6 @@ from mcq.prompt import MCQ_SCHEMA, build_mcq_prompt
 from mcq.parser import normalize_mcqs
 from dotenv import load_dotenv
 
-# ✅ FIXED: Remove problematic import
-# from backend.db import schedule_quiz_retake_if_needed # This was causing the error
-
-# Import auth functions
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from auth.routes import decode_auth_token
@@ -38,39 +34,30 @@ def get_user_from_token():
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:
         return None
-    
+
     user_data = decode_auth_token(token)
     if user_data and "username" in user_data:
         db = get_db()
         user = db.execute('SELECT * FROM users WHERE username = ?', (user_data["username"],)).fetchone()
         return dict(user) if user else None
-    
+
     return None
 
-# ✅ ADDED: Placeholder function for quiz retake scheduling
+# Placeholder function for quiz retake scheduling
 def schedule_quiz_retake_if_needed(user_id, topic, taken_at, score, total_questions):
-    """
-    Placeholder function for quiz retake scheduling.
-    This can be implemented later with the full scheduler service.
-    """
     try:
-        # Simple logic: schedule retake if score is below 60%
-        percentage = (score / total_questions) * 100
+        percentage = (score / total_questions) * 100 if total_questions else 0
         if percentage < 60:
             print(f"📚 User {user_id} needs retake for {topic} (scored {percentage:.1f}%)")
-            # TODO: Implement actual scheduling logic here
-            # For now, just log the need for retake
-            pass
+        # Retake logic can be added here if needed
     except Exception as e:
         print(f"Error in retake scheduling: {e}")
         pass
 
-# ✅ ENHANCED: Add OPTIONS support and debugging
 @quiz_bp.route("/upload", methods=["POST", "OPTIONS"])
 def upload_and_generate():
     # Handle preflight
     if request.method == "OPTIONS":
-        print("🔀 Quiz upload OPTIONS request")
         response = jsonify()
         response.headers.add('Access-Control-Allow-Origin', '*')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
@@ -78,11 +65,6 @@ def upload_and_generate():
         return response
 
     try:
-        print(f"📤 Quiz upload request received:")
-        print(f"   Method: {request.method}")
-        print(f"   Files: {list(request.files.keys())}")
-        print(f"   Form: {dict(request.form)}")
-
         if "file" not in request.files:
             return jsonify({"success": False, "error": "file field is required"}), 400
 
@@ -91,13 +73,9 @@ def upload_and_generate():
         ext = filename.lower().strip()
         stream = io.BytesIO(f.read())
 
-        print(f"   Processing file: {filename}")
-
         if ext.endswith(".pdf"):
-            print("📄 Processing PDF file...")
             text = read_pdf(stream)
         elif ext.endswith(".txt"):
-            print("📝 Processing TXT file...")
             text = read_txt(stream)
         else:
             return jsonify({"success": False, "error": "Only PDF and TXT files are supported"}), 400
@@ -109,12 +87,8 @@ def upload_and_generate():
 
         num_q = int(request.form.get("numq", 5))
         difficulty = request.form.get("difficulty", "mixed")
-        
-        print(f"🎯 Generating quiz: {num_q} questions, {difficulty} difficulty")
 
         prompt = build_mcq_prompt(text, num_q=num_q, difficulty=difficulty)
-
-        print("🤖 Calling Gemini API...")
         response = client.models.generate_content(
             model="gemini-2.0-flash-exp",
             contents=prompt,
@@ -127,13 +101,10 @@ def upload_and_generate():
         raw_json = response.text
         data = json.loads(raw_json)
         quiz = normalize_mcqs(data)
-        
-        print(f"✅ Quiz generated successfully: {len(quiz)} questions")
 
         return jsonify({"success": True, "quiz": quiz})
 
     except Exception as e:
-        print(f"❌ Error in upload_and_generate: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
@@ -149,7 +120,7 @@ def check_answer():
         corr_idx = int(item.get("answerIndex", 0))
         corr_letter = item.get("answerLetter", "A")
         explanation = item.get("explanation", "")
-        
+
         return jsonify({
             "success": True,
             "correct": sel == corr_idx,
@@ -165,7 +136,7 @@ def save_quiz_result():
     try:
         user = get_user_from_token()
         data = request.get_json(force=True)
-        
+
         username = user["username"] if user else data.get("username")
         user_id = user["id"] if user else None
         score = data.get("score")
@@ -173,7 +144,7 @@ def save_quiz_result():
         topic = data.get("topic", "General")
         difficulty = data.get("difficulty", "mixed")
         time_taken = data.get("time_taken", 0)
-        qnas = data.get("qnas", [])  # List of quiz answers
+        qnas = data.get("qnas", [])
 
         if not username or score is None or total_questions is None:
             return jsonify({"success": False, "error": "Missing required fields"}), 400
@@ -181,7 +152,6 @@ def save_quiz_result():
         percentage = round((score / total_questions) * 100, 2)
         db = get_db()
 
-        # Create table if not exists (ensure compatibility)
         db.execute("""
             CREATE TABLE IF NOT EXISTS quiz_attempts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -212,16 +182,13 @@ def save_quiz_result():
             )
         """)
 
-        # Insert quiz attempt and get its id
         cursor = db.execute("""
             INSERT INTO quiz_attempts
             (user_id, username, score, total_questions, percentage, topic, difficulty, time_taken)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (user_id, username, score, total_questions, percentage, topic, difficulty, time_taken))
-
         attempt_id = cursor.lastrowid
 
-        # Insert each quiz answer record
         for qa in qnas:
             question = qa.get('question', '')
             correct_answer = qa.get('correct_answer', '')
@@ -236,12 +203,9 @@ def save_quiz_result():
             """, (attempt_id, username, question, correct_answer, user_answer, is_correct, explanation))
 
         db.commit()
-
-        # Fetch taken_at from this newly inserted attempt
         row = db.execute("SELECT taken_at FROM quiz_attempts WHERE id = ?", (attempt_id,)).fetchone()
         taken_at = row['taken_at'] if row else None
 
-        # ✅ FIXED: Use local function instead of import
         if taken_at is not None and user_id:
             schedule_quiz_retake_if_needed(user_id, topic, taken_at, score, total_questions)
 
@@ -256,24 +220,30 @@ def quiz_history():
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Authentication required"}), 401
-    
+
     try:
         limit = int(request.args.get("limit", 50))
         db = get_db()
-        
+
         attempts = db.execute("""
-            SELECT id, score, total_questions, percentage, topic, difficulty, time_taken, taken_at as created_at
+            SELECT id, score, total_questions, percentage, topic, difficulty, time_taken, taken_at
             FROM quiz_attempts 
             WHERE user_id = ? OR username = ?
             ORDER BY taken_at DESC 
             LIMIT ?
         """, (user["id"], user["username"], limit)).fetchall()
-        
+
+        # Map taken_at to created_at for frontend
+        mapped = [{
+            **dict(attempt),
+            "created_at": attempt["taken_at"]
+        } for attempt in attempts]
+
         return jsonify({
             "success": True,
-            "data": [dict(attempt) for attempt in attempts]
+            "data": mapped
         })
-        
+
     except Exception as e:
         print(f"Quiz history error: {e}")
         return jsonify({"error": "Failed to get quiz history"}), 500
@@ -283,10 +253,10 @@ def quiz_stats():
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Authentication required"}), 401
-    
+
     try:
         db = get_db()
-        
+
         stats = db.execute("""
             SELECT
                 COUNT(*) as total_attempts,
@@ -296,7 +266,7 @@ def quiz_stats():
             FROM quiz_attempts
             WHERE user_id = ? OR username = ?
         """, (user["id"], user["username"])).fetchone()
-        
+
         if stats and stats['total_attempts'] > 0:
             result = {
                 'total_attempts': stats['total_attempts'],
@@ -311,12 +281,12 @@ def quiz_stats():
                 'best_score': 0,
                 'last_attempt': None
             }
-        
+
         return jsonify({
             "success": True,
             "data": result
         })
-        
+
     except Exception as e:
         print(f"Quiz stats error: {e}")
         return jsonify({"error": "Failed to get quiz stats"}), 500
@@ -325,7 +295,7 @@ def quiz_stats():
 def get_user_quiz_stats(username):
     try:
         db = get_db()
-        
+
         stats = db.execute("""
             SELECT
                 COUNT(*) as total_attempts,
@@ -339,17 +309,22 @@ def get_user_quiz_stats(username):
 
         recent_attempts = db.execute("""
             SELECT score, total_questions, percentage, topic, difficulty,
-                   time_taken, taken_at as created_at
+                   time_taken, taken_at
             FROM quiz_attempts
             WHERE username = ?
             ORDER BY taken_at DESC
             LIMIT 10
         """, (username,)).fetchall()
 
+        mapped = [{
+            **dict(attempt),
+            "created_at": attempt["taken_at"]
+        } for attempt in recent_attempts]
+
         return jsonify({
             "success": True,
             "stats": dict(stats) if stats else None,
-            "recent_attempts": [dict(attempt) for attempt in recent_attempts]
+            "recent_attempts": mapped
         })
 
     except Exception as e:
@@ -360,7 +335,7 @@ def get_user_quiz_stats(username):
 def get_leaderboard():
     try:
         db = get_db()
-        
+
         leaderboard = db.execute("""
             SELECT
                 username,
@@ -379,7 +354,6 @@ def get_leaderboard():
         print(f"Error in get_leaderboard: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ✅ ADDED: Test route for debugging
 @quiz_bp.route("/test", methods=["GET"])
 def test_route():
     return jsonify({
