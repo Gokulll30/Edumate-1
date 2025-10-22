@@ -46,7 +46,7 @@ export default function QuizGenerator() {
   const query = useQuery();
   const subjectFromUrl = query.get('subject');
 
-  // Array to store user's answers as they click
+  // Array of user's selected answers for each question (index = question number)
   const [userAnswers, setUserAnswers] = useState<Array<number | null>>([]);
 
   useEffect(() => {
@@ -56,9 +56,8 @@ export default function QuizGenerator() {
     }
   }, [subjectFromUrl]);
 
-  // When quiz is generated, reset answers
+  // On new quiz, reset answer array
   useEffect(() => {
-    // Set default userAnswers
     setUserAnswers(Array(quiz.length).fill(null));
   }, [quiz.length]);
 
@@ -116,7 +115,6 @@ export default function QuizGenerator() {
       if (result.success) {
         setFeedback(result);
         setShowAnswer(true);
-        // Save user answer for this question
         setUserAnswers((prev) => {
           const newAnswers = [...prev];
           newAnswers[currentQuestion] = selectedAnswer;
@@ -141,7 +139,7 @@ export default function QuizGenerator() {
     }
   };
 
-  // Save with all user's answers after quiz complete
+  // Save result with all relevant fields once the quiz is completed
   const saveQuizScore = async () => {
     if (!user?.username || quizSaved) return;
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
@@ -408,7 +406,7 @@ export default function QuizGenerator() {
                   <div className="text-2xl font-bold text-blue-500">{score}</div>
                   <div className="text-sm text-gray-400">Correct Answers</div>
                 </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
+                <div className={`bg-gray-700 p-4 rounded-lg`}>
                   <div className={`text-2xl font-bold ${getScoreColor((score / quiz.length) * 100)}`}>
                     {Math.round((score / quiz.length) * 100)}%
                   </div>

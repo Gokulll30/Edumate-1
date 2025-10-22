@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from db import get_db_connection
 from db import get_chat_history, get_user_by_username
 from auth.routes import decode_auth_token
 from chat.service import get_chat_response  # absolute import

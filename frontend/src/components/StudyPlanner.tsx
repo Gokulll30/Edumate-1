@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Navigation from './Navigation';
 import {
   Calendar,
@@ -28,67 +28,141 @@ interface StudySession {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
+function normalizeDateString(dt: string | Date | null | undefined): string {
+  if (!dt) return '';
+  if (dt instanceof Date) return dt.toISOString().slice(0, 10);
+  if (typeof dt === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}/.test(dt)) return dt.slice(0, 10);
+    if (/^\d{2}-\d{2}-\d{4}$/.test(dt)) {
+      const [dd, mm, yyyy] = dt.split('-');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    try {
+      return new Date(dt).toISOString().slice(0, 10);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+function normalizeTimeString(time: any): string {
+  if (!time) return '00:00';
+  if (typeof time === 'string' && time.includes(':')) return time.slice(0, 5);
+  if (typeof time === 'string') return time;
+  if (time instanceof Date) return time.toTimeString().slice(0, 5);
+  return '00:00';
+}
+
 export default function StudyPlanner() {
   const { user } = useAuth();
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const minDate = new Date().toISOString().slice(0, 10);
+  const [selectedDate, setSelectedDate] = useState(minDate);
   const [showAddModal, setShowAddModal] = useState(false);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [loading, setLoading] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
-
   const [newSession, setNewSession] = useState({
     title: '',
     subject: '',
     duration: 60,
-    date: selectedDate,
+    date: minDate,
     time: '10:00',
     type: 'study' as StudySession['type'],
     priority: 'medium' as StudySession['priority'],
     notes: ''
   });
 
-  useEffect(() => {
-    const fetchSessions = async () => {
-      if (!user) return;
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/study/sessions?userId=${encodeURIComponent(user.id)}`);
-        const data = await res.json();
-        if (data?.success) {
-          const mapped = data.sessions.map((s: any) => ({
+  // GET all sessions
+  const fetchSessions = async () => {
+    if (!user) return setSessions([]);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/study/sessions?userId=${encodeURIComponent(user.id)}`);
+      const data = await res.json();
+      if (data?.success) {
+        const mapped: StudySession[] = data.sessions.map((s: any) => {
+          let dateStr = '';
+          if (typeof s.date === 'string') {
+            try {
+              dateStr = new Date(s.date).toISOString().slice(0, 10);
+            } catch {
+              dateStr = s.date.slice(0, 10);
+            }
+          } else if (s.date instanceof Date) {
+            dateStr = s.date.toISOString().slice(0, 10);
+          } else {
+            dateStr = '';
+          }
+          return {
             id: String(s.id),
             title: s.title,
             subject: s.subject,
             duration: Number(s.duration || 60),
-            date: s.date || '',
-            time: s.time || '',
+            date: dateStr,
+            time: normalizeTimeString(s.time),
             type: (s.type || 'study') as StudySession['type'],
             priority: (s.priority || 'medium') as StudySession['priority'],
             completed: !!s.completed,
             notes: s.notes || ''
-          }));
-          setSessions(mapped);
-        }
-      } catch (err) {
-        console.error('Failed to load sessions', err);
-      } finally {
-        setLoading(false);
+          };
+        });
+        setSessions(mapped);
+      } else {
+        setSessions([]);
       }
-    };
-    fetchSessions();
-  }, [user]);
-
-  const getTypeIcon = (type: StudySession['type']) => {
-    const icons = {
-      study: Book,
-      quiz: Target,
-      review: Brain,
-      project: Edit
-    };
-    return icons[type];
+    } catch (err) {
+      setSessions([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  useEffect(() => { fetchSessions(); }, [user]);
+
+  function dateTimeString(date: string, time: string) {
+    return `${normalizeDateString(date)}T${normalizeTimeString(time)}`;
+  }
+  function toLocalDateStr(date: string) {
+    try {
+      return new Date(normalizeDateString(date)).toLocaleDateString();
+    } catch {
+      return date;
+    }
+  }
+
+  // Today's sessions
+  const todaySessions = sessions.filter(session => {
+    const normSessionDate = normalizeDateString(session.date);
+    const normSelectedDate = normalizeDateString(selectedDate);
+    return normSessionDate === normSelectedDate && !session.completed;
+  });
+
+  // Upcoming Sessions: show all that are not completed and are today or in the future
+  const now = new Date();
+  const upcomingSessions = sessions
+    .filter(s => {
+      if (s.completed) return false;
+      const sessionDate = new Date(dateTimeString(s.date, s.time));
+      // Today (any time left) or any session after today
+      return sessionDate >= new Date(minDate);
+    })
+    .sort((a, b) =>
+      new Date(dateTimeString(a.date, a.time)).getTime() - new Date(dateTimeString(b.date, b.time)).getTime()
+    );
+
+  const weeklyStats = {
+    totalSessions: sessions.length,
+    completedSessions: sessions.filter(s => s.completed).length,
+    totalHours: sessions.reduce((acc, s) => acc + s.duration, 0) / 60,
+    completedHours: sessions.filter(s => s.completed).reduce((acc, s) => acc + s.duration, 0) / 60
+  };
+
+  const getTypeIcon = (type: StudySession['type']) => {
+    const icons = { study: Book, quiz: Target, review: Brain, project: Edit };
+    return icons[type];
+  };
   const getTypeColor = (type: StudySession['type']) => {
     const colors = {
       study: 'bg-blue-500/20 text-blue-400',
@@ -98,7 +172,6 @@ export default function StudyPlanner() {
     };
     return colors[type];
   };
-
   const getPriorityColor = (priority: StudySession['priority']) => {
     const colors = {
       low: 'border-l-green-500',
@@ -110,8 +183,7 @@ export default function StudyPlanner() {
 
   function validateDateTime() {
     const now = new Date();
-    const sessionDateTime = new Date(`${newSession.date}T${newSession.time}`);
-    // Date/time is in the past
+    const sessionDateTime = new Date(dateTimeString(newSession.date, newSession.time));
     if (sessionDateTime < now) {
       setWarning("You cannot schedule a session in the past.");
       return false;
@@ -120,9 +192,11 @@ export default function StudyPlanner() {
     return true;
   }
 
+  // Add Session
   const handleAddSession = async () => {
     if (!user) return alert('Please sign in to add sessions');
     if (!validateDateTime()) return;
+
     const payload = {
       userId: user.id,
       title: newSession.title,
@@ -134,6 +208,7 @@ export default function StudyPlanner() {
       priority: newSession.priority,
       notes: newSession.notes
     };
+
     try {
       const res = await fetch(`${API_BASE}/study/sessions`, {
         method: 'POST',
@@ -142,25 +217,12 @@ export default function StudyPlanner() {
       });
       const data = await res.json();
       if (data?.success) {
-        const s = data.session;
-        const mapped = {
-          id: String(s.id),
-          title: s.title,
-          subject: s.subject,
-          duration: Number(s.duration || 60),
-          date: s.date || '',
-          time: s.time || '',
-          type: (s.type || 'study') as StudySession['type'],
-          priority: (s.priority || 'medium') as StudySession['priority'],
-          completed: !!s.completed,
-          notes: s.notes || ''
-        };
-        setSessions(prev => [...prev, mapped]);
+        fetchSessions();
         setNewSession({
           title: '',
           subject: '',
           duration: 60,
-          date: selectedDate,
+          date: minDate,
           time: '10:00',
           type: 'study',
           priority: 'medium',
@@ -170,14 +232,13 @@ export default function StudyPlanner() {
         setWarning(null);
       } else {
         setWarning('Failed to add session. Please try again.');
-        console.error('Add session failed', data);
       }
     } catch (err) {
       setWarning('Add session error. Please try again.');
-      console.error('Add session error', err);
     }
   };
 
+  // Toggle Completion
   const toggleCompletion = async (id: string) => {
     if (!user) return;
     try {
@@ -187,52 +248,24 @@ export default function StudyPlanner() {
         body: JSON.stringify({ userId: user.id })
       });
       const data = await res.json();
-      if (data?.success) {
-        const s = data.session;
-        setSessions(prev => prev.map(sess => (sess.id === String(s.id) ? {
-          ...sess,
-          completed: !!s.completed
-        } : sess)));
-      }
-    } catch (err) {
-      console.error('Toggle completion error', err);
-    }
+      if (data?.success) fetchSessions();
+    } catch (err) {}
   };
 
+  // Complete session on delete (increase completed count but do NOT remove; mark completed in backend)
   const deleteSession = async (id: string) => {
     if (!user) return;
+    // Instead of deleting, mark as completed
     try {
-      const res = await fetch(`${API_BASE}/study/sessions/${encodeURIComponent(id)}?userId=${encodeURIComponent(user.id)}`, {
-        method: 'DELETE'
+      const res = await fetch(`${API_BASE}/study/sessions/${encodeURIComponent(id)}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
       });
       const data = await res.json();
-      if (data?.success) {
-        setSessions(prev => prev.filter(s => s.id !== id));
-      }
-    } catch (err) {
-      console.error('Delete session error', err);
-    }
+      if (data?.success) fetchSessions();
+    } catch (err) {}
   };
-
-  const getSessionsForDate = (date: string) => {
-    return sessions.filter(session => session.date === date);
-  };
-
-  const todaySessions = getSessionsForDate(selectedDate);
-  const weeklyStats = {
-    totalSessions: sessions.length,
-    completedSessions: sessions.filter(s => s.completed).length,
-    totalHours: sessions.reduce((acc, s) => acc + s.duration, 0) / 60,
-    completedHours: sessions.filter(s => s.completed).reduce((acc, s) => acc + s.duration, 0) / 60
-  };
-
-  // For upcoming sessions, scrollable if there are many
-  const upcomingSessions = sessions
-    .filter(s => !s.completed && new Date(`${s.date}T${s.time}`) >= new Date())
-    .sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
-
-  // Minimum date for session pickers is always today
-  const minDate = new Date().toISOString().split('T')[0];
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -282,7 +315,6 @@ export default function StudyPlanner() {
             </button>
           </div>
         </div>
-
         {/* Weekly Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
@@ -311,9 +343,7 @@ export default function StudyPlanner() {
             <div>
               <p className="text-2xl font-bold text-white">
                 {weeklyStats.totalSessions > 0
-                  ? Math.round(
-                      (weeklyStats.completedSessions / weeklyStats.totalSessions) * 100
-                    )
+                  ? Math.round((weeklyStats.completedSessions / weeklyStats.totalSessions) * 100)
                   : 0}
                 %
               </p>
@@ -321,20 +351,19 @@ export default function StudyPlanner() {
             </div>
           </div>
         </div>
-
         {/* Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sessions List */}
           <div className="lg:col-span-2 bg-slate-800 rounded-xl p-6 border border-slate-700 shadow">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-semibold text-white">
-                Sessions for {new Date(selectedDate).toLocaleDateString()}
+                Sessions for {toLocalDateStr(selectedDate)}
               </h3>
               <input
                 type="date"
-                value={selectedDate}
+                value={normalizeDateString(selectedDate)}
                 min={minDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={e => setSelectedDate(normalizeDateString(e.target.value))}
                 className="bg-slate-700 text-white rounded-lg px-3 py-2 border border-slate-600 focus:outline-none focus:border-purple-500"
                 style={{ minWidth: '120px', maxWidth: '180px' }}
               />
@@ -357,7 +386,7 @@ export default function StudyPlanner() {
                   </button>
                 </div>
               ) : (
-                todaySessions.map((session) => {
+                todaySessions.map(session => {
                   const Icon = getTypeIcon(session.type);
                   return (
                     <div
@@ -395,6 +424,7 @@ export default function StudyPlanner() {
                       <button
                         onClick={() => deleteSession(session.id)}
                         className="text-slate-400 hover:text-red-400 transition-colors ml-3"
+                        title="Mark as completed"
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
@@ -404,8 +434,7 @@ export default function StudyPlanner() {
               )}
             </div>
           </div>
-
-          {/* Upcoming Sessions (Scrollable for many sessions) */}
+          {/* Upcoming Sessions */}
           <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow">
             <h3 className="text-xl font-semibold text-white mb-6">Upcoming Sessions</h3>
             <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
@@ -414,7 +443,7 @@ export default function StudyPlanner() {
                   No upcoming sessions
                 </div>
               ) : (
-                upcomingSessions.map((session) => {
+                upcomingSessions.map(session => {
                   const Icon = getTypeIcon(session.type);
                   return (
                     <div key={session.id} className="flex items-center space-x-3 p-3 bg-slate-700/60 rounded-lg">
@@ -424,7 +453,7 @@ export default function StudyPlanner() {
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium truncate">{session.title}</p>
                         <p className="text-slate-400 text-sm">
-                          {new Date(session.date).toLocaleDateString()} at {session.time}
+                          {toLocalDateStr(session.date)} at {session.time}
                         </p>
                       </div>
                     </div>
@@ -434,8 +463,6 @@ export default function StudyPlanner() {
             </div>
           </div>
         </div>
-
-        {/* Add Session Modal */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto">
             <div className="w-full max-w-lg bg-slate-900 rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[90vh]">
@@ -480,9 +507,9 @@ export default function StudyPlanner() {
                       </label>
                       <input
                         type="date"
-                        value={newSession.date}
+                        value={normalizeDateString(newSession.date)}
                         min={minDate}
-                        onChange={e => setNewSession({ ...newSession, date: e.target.value })}
+                        onChange={e => setNewSession({ ...newSession, date: normalizeDateString(e.target.value) })}
                         className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-purple-500"
                       />
                     </div>
