@@ -136,78 +136,76 @@ def save_quiz_result():
     try:
         user = get_user_from_token()
         data = request.get_json(force=True)
-
         username = user["username"] if user else data.get("username")
         user_id = user["id"] if user else None
         score = data.get("score")
-        total_questions = data.get("total_questions")
+        num_questions = data.get("num_questions")  # <-- fixed
         topic = data.get("topic", "General")
         difficulty = data.get("difficulty", "mixed")
         time_taken = data.get("time_taken", 0)
-        qnas = data.get("qnas", [])
+        qnas = data.get("qnas", [])  # List of quiz answers
 
-        if not username or score is None or total_questions is None:
+        if not username or score is None or num_questions is None:
             return jsonify({"success": False, "error": "Missing required fields"}), 400
-
-        percentage = round((score / total_questions) * 100, 2)
+        percentage = round((score / num_questions) * 100, 2)
         db = get_db()
-
+        # Create table if not exists
         db.execute("""
-            CREATE TABLE IF NOT EXISTS quiz_attempts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                username TEXT NOT NULL,
-                score INTEGER NOT NULL,
-                total_questions INTEGER NOT NULL,
-                percentage REAL NOT NULL,
-                topic TEXT,
-                difficulty TEXT,
-                time_taken INTEGER,
-                taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
+        CREATE TABLE IF NOT EXISTS quiz_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT NOT NULL,
+            score INTEGER NOT NULL,
+            num_questions INTEGER NOT NULL,
+            percentage REAL NOT NULL,
+            topic TEXT,
+            difficulty TEXT,
+            time_taken INTEGER,
+            taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
         """)
-
         db.execute("""
-            CREATE TABLE IF NOT EXISTS quiz_answers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                attempt_id INTEGER NOT NULL,
-                user_name TEXT,
-                question TEXT NOT NULL,
-                correct_answer TEXT NOT NULL,
-                user_answer TEXT NOT NULL,
-                is_correct INTEGER NOT NULL,
-                explanation TEXT,
-                FOREIGN KEY (attempt_id) REFERENCES quiz_attempts(id)
-            )
+        CREATE TABLE IF NOT EXISTS quiz_answers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            attempt_id INTEGER NOT NULL,
+            user_name TEXT,
+            question TEXT NOT NULL,
+            correct_answer TEXT NOT NULL,
+            user_answer TEXT NOT NULL,
+            is_correct INTEGER NOT NULL,
+            explanation TEXT,
+            FOREIGN KEY (attempt_id) REFERENCES quiz_attempts(id)
+        )
         """)
-
+        # Insert quiz attempt and get its id
         cursor = db.execute("""
             INSERT INTO quiz_attempts
-            (user_id, username, score, total_questions, percentage, topic, difficulty, time_taken)
+            (user_id, username, score, num_questions, percentage, topic, difficulty, time_taken)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, username, score, total_questions, percentage, topic, difficulty, time_taken))
+        """, (user_id, username, score, num_questions, percentage, topic, difficulty, time_taken))
         attempt_id = cursor.lastrowid
 
+        # Insert each quiz answer record
         for qa in qnas:
             question = qa.get('question', '')
             correct_answer = qa.get('correct_answer', '')
             user_answer = qa.get('user_answer', '')
             is_correct = 1 if qa.get('is_correct') else 0
             explanation = qa.get('explanation', '')
-
             db.execute("""
                 INSERT INTO quiz_answers
                 (attempt_id, user_name, question, correct_answer, user_answer, is_correct, explanation)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (attempt_id, username, question, correct_answer, user_answer, is_correct, explanation))
-
         db.commit()
+
+        # Fetch taken_at from this newly inserted attempt
         row = db.execute("SELECT taken_at FROM quiz_attempts WHERE id = ?", (attempt_id,)).fetchone()
         taken_at = row['taken_at'] if row else None
-
-        if taken_at is not None and user_id:
-            schedule_quiz_retake_if_needed(user_id, topic, taken_at, score, total_questions)
+        # Schedule retake if desired (implement or comment this out)
+        # if taken_at is not None:
+        #    schedule_quiz_retake_if_needed(user_id, topic, taken_at, score, num_questions)
 
         return jsonify({"success": True, "message": "Quiz result and answers saved successfully", "percentage": percentage})
 
@@ -220,30 +218,20 @@ def quiz_history():
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Authentication required"}), 401
-
     try:
         limit = int(request.args.get("limit", 50))
         db = get_db()
-
         attempts = db.execute("""
-            SELECT id, score, total_questions, percentage, topic, difficulty, time_taken, taken_at
+            SELECT id, score, num_questions, percentage, topic, difficulty, time_taken, taken_at as created_at
             FROM quiz_attempts 
             WHERE user_id = ? OR username = ?
             ORDER BY taken_at DESC 
             LIMIT ?
         """, (user["id"], user["username"], limit)).fetchall()
-
-        # Map taken_at to created_at for frontend
-        mapped = [{
-            **dict(attempt),
-            "created_at": attempt["taken_at"]
-        } for attempt in attempts]
-
         return jsonify({
             "success": True,
-            "data": mapped
+            "data": [dict(attempt) for attempt in attempts]
         })
-
     except Exception as e:
         print(f"Quiz history error: {e}")
         return jsonify({"error": "Failed to get quiz history"}), 500
@@ -253,10 +241,8 @@ def quiz_stats():
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Authentication required"}), 401
-
     try:
         db = get_db()
-
         stats = db.execute("""
             SELECT
                 COUNT(*) as total_attempts,
@@ -266,7 +252,6 @@ def quiz_stats():
             FROM quiz_attempts
             WHERE user_id = ? OR username = ?
         """, (user["id"], user["username"])).fetchone()
-
         if stats and stats['total_attempts'] > 0:
             result = {
                 'total_attempts': stats['total_attempts'],
@@ -281,12 +266,10 @@ def quiz_stats():
                 'best_score': 0,
                 'last_attempt': None
             }
-
         return jsonify({
             "success": True,
             "data": result
         })
-
     except Exception as e:
         print(f"Quiz stats error: {e}")
         return jsonify({"error": "Failed to get quiz stats"}), 500
@@ -295,7 +278,6 @@ def quiz_stats():
 def get_user_quiz_stats(username):
     try:
         db = get_db()
-
         stats = db.execute("""
             SELECT
                 COUNT(*) as total_attempts,
@@ -306,27 +288,19 @@ def get_user_quiz_stats(username):
             FROM quiz_attempts
             WHERE username = ?
         """, (username,)).fetchone()
-
         recent_attempts = db.execute("""
-            SELECT score, total_questions, percentage, topic, difficulty,
-                   time_taken, taken_at
+            SELECT score, num_questions, percentage, topic, difficulty,
+                   time_taken, taken_at as created_at
             FROM quiz_attempts
             WHERE username = ?
             ORDER BY taken_at DESC
             LIMIT 10
         """, (username,)).fetchall()
-
-        mapped = [{
-            **dict(attempt),
-            "created_at": attempt["taken_at"]
-        } for attempt in recent_attempts]
-
         return jsonify({
             "success": True,
             "stats": dict(stats) if stats else None,
-            "recent_attempts": mapped
+            "recent_attempts": [dict(attempt) for attempt in recent_attempts]
         })
-
     except Exception as e:
         print(f"Error in get_user_quiz_stats: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -335,7 +309,6 @@ def get_user_quiz_stats(username):
 def get_leaderboard():
     try:
         db = get_db()
-
         leaderboard = db.execute("""
             SELECT
                 username,
@@ -347,23 +320,7 @@ def get_leaderboard():
             ORDER BY avg_percentage DESC, best_score DESC
             LIMIT 10
         """).fetchall()
-
         return jsonify({"success": True, "leaderboard": [dict(user) for user in leaderboard]})
-
     except Exception as e:
         print(f"Error in get_leaderboard: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
-
-@quiz_bp.route("/test", methods=["GET"])
-def test_route():
-    return jsonify({
-        "message": "Quiz blueprint is working!",
-        "timestamp": "2025-10-14",
-        "available_routes": [
-            "/quiz/upload",
-            "/quiz/check", 
-            "/quiz/save-result",
-            "/quiz/history",
-            "/quiz/stats"
-        ]
-    })
