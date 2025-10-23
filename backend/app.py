@@ -13,12 +13,10 @@ load_dotenv(os.path.join(APP_DIR, "..", ".env"))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-# Flask app initialization
 app = Flask(__name__)
 
 # --- CORS CONFIGURATION ---
-# For development, allow localhost; for production, allow your vercel deploy.
-# Wildcard subdomains on Vercel are enabled via regex.
+# For Render + Vercel, allow localhost and your production domains.
 CORS(
     app,
     origins=[
@@ -29,16 +27,14 @@ CORS(
     ],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
-    supports_credentials=False  # Use True only if you are using cookies/auth
+    supports_credentials=False
 )
 
-# MySQL connection per-request
 @app.before_request
 def before_request():
     if "db" not in g:
         g.db = get_db_connection()
 
-# Safe teardown (handles "Unread result found" edge case)
 @app.teardown_appcontext
 def teardown_db(exception):
     db = g.pop("db", None)
@@ -59,7 +55,6 @@ def teardown_db(exception):
             else:
                 raise e
 
-# Blueprint registration with error handling
 print("\n🔧 Registering blueprints...")
 try:
     from auth.routes import auth_bp
@@ -89,7 +84,6 @@ try:
 except Exception as e:
     print(f"❌ Study blueprint registration failed: {e}")
 
-# Health Check Route
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
@@ -98,7 +92,6 @@ def health():
         "timestamp": "2025-10-14"
     })
 
-# Test route for quiz
 @app.route("/test-quiz", methods=["GET"])
 def test_quiz():
     return jsonify({
@@ -106,9 +99,6 @@ def test_quiz():
         "available_endpoints": ["/quiz/upload", "/quiz/test"]
     })
 
-# REMOVE manual preflight handler; Flask-CORS handles OPTIONS automatically
-
-# Enhanced error handlers
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({
@@ -133,7 +123,6 @@ def internal_error(e):
     print(f"❌ 500 Error: {str(e)}")
     return jsonify({"success": False, "error": "Internal server error"}), 500
 
-# Startup log
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("🚀 EDUMATE BACKEND STARTING")

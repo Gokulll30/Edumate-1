@@ -11,9 +11,6 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 SECRET_KEY = 'Kjs8u9dxw7Gkn2LbVbXEcmJNv4Y6Tq1D'
 
 def create_auth_token(user_data):
-    """
-    Create a JWT token with user id and username, valid for 7 days
-    """
     payload = {
         "id": user_data["id"],
         "username": user_data["username"],
@@ -23,9 +20,6 @@ def create_auth_token(user_data):
     return token
 
 def decode_auth_token(token):
-    """
-    Decode the JWT token and return the payload or None if invalid/expired
-    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         return payload
@@ -34,8 +28,11 @@ def decode_auth_token(token):
     except jwt.InvalidTokenError:
         return None
 
-@auth_bp.route('/login', methods=['POST'])
+@auth_bp.route('/login', methods=['POST', 'OPTIONS'])
 def login():
+    if request.method == "OPTIONS":
+        # Let Flask-CORS take care of headers, just return empty 204
+        return '', 204
     try:
         data = request.get_json(force=True)
         login_input = data.get('username') or data.get('email')
@@ -45,21 +42,16 @@ def login():
             return jsonify({'success': False, 'error': 'Username/email and password required'}), 400
 
         conn = get_db_connection()
-
-        # --- Use a fresh cursor for each query ---
-        # 1. SELECT user by username or email
         select_cur = conn.cursor(dictionary=True)
         select_cur.execute('SELECT * FROM users WHERE username = %s OR email = %s', (login_input, login_input))
         user = select_cur.fetchone()
-        select_cur.close()  # Always close SELECT cursor after fetching
-
+        select_cur.close()
         if not user or not check_password_hash(user['password_hash'], password):
             return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
 
         user_data = {k: user[k] for k in user.keys() if k != 'password_hash'}
         token = create_auth_token(user_data)
 
-        # 2. Log successful login (separate cursor)
         try:
             log_cur = conn.cursor()
             log_cur.execute(
@@ -76,8 +68,10 @@ def login():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@auth_bp.route('/signup', methods=['POST'])
+@auth_bp.route('/signup', methods=['POST', 'OPTIONS'])
 def signup():
+    if request.method == "OPTIONS":
+        return '', 204
     try:
         data = request.get_json(force=True)
         username = data.get('username')
@@ -88,7 +82,6 @@ def signup():
             return jsonify({'success': False, 'error': 'Username and password required'}), 400
 
         conn = get_db_connection()
-        # 1. Check existence
         exist_cur = conn.cursor(dictionary=True)
         exist_cur.execute('SELECT 1 FROM users WHERE username = %s', (username,))
         exist = exist_cur.fetchone()
@@ -96,7 +89,6 @@ def signup():
         if exist:
             return jsonify({'success': False, 'error': 'Username already taken'}), 400
 
-        # 2. Insert new user
         pw_hash = generate_password_hash(password)
         insert_cur = conn.cursor()
         insert_cur.execute(
@@ -106,7 +98,6 @@ def signup():
         conn.commit()
         insert_cur.close()
 
-        # 3. Get user for response
         fetch_cur = conn.cursor(dictionary=True)
         fetch_cur.execute('SELECT id, username FROM users WHERE username = %s', (username,))
         user = fetch_cur.fetchone()
@@ -141,10 +132,6 @@ def profile():
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
-    """
-    Logout endpoint - mainly for frontend to clear token
-    Can also update login_sessions table if needed
-    """
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if token:
         user_data = decode_auth_token(token)
@@ -170,9 +157,6 @@ def logout():
 
 @auth_bp.route('/verify', methods=['GET'])
 def verify_token():
-    """
-    Verify if a token is still valid
-    """
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:
         return jsonify({"valid": False, "error": "No token provided"}), 401
@@ -183,11 +167,7 @@ def verify_token():
 
     return jsonify({"valid": True, "user": {"id": user_data["id"], "username": user_data["username"]}})
 
-# Helper function for other routes to get authenticated user
 def get_user_from_token():
-    """
-    Helper function to get user from auth token - can be imported by other routes
-    """
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:
         return None
@@ -202,7 +182,6 @@ def get_user_from_token():
         return user
     return None
 
-# JSON error handlers
 @auth_bp.app_errorhandler(404)
 def handle_404(e):
     return jsonify({'success': False, 'error': 'Not found'}), 404
