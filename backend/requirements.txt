@@ -10,3 +10,4 @@ gunicorn==21.2.0
 groq==0.13.0
 docx2txt==0.9
 mysql-connector-python==8.4.0
+requests==2.31.0
