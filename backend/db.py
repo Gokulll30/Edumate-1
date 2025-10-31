@@ -185,6 +185,39 @@ def _ensure_tables(conn):
         FOREIGN KEY (attempt_id) REFERENCES quiz_attempts(id)
     )
     """)
+    
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_tokens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        credentials TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """)
+
+    # Table for mapping study sessions to Google Calendar event IDs
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS calendar_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        session_id INT,
+        event_id VARCHAR(255) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(session_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """)
+        # Add calendar_event_id to study_sessions (only if not exists)
+    try:
+        cur.execute("ALTER TABLE study_sessions ADD COLUMN calendar_event_id VARCHAR(255) DEFAULT NULL")
+    except mysql.connector.errors.ProgrammingError as e:
+        if "Duplicate column name" not in str(e):
+            raise
+
 
     conn.commit()
     cur.close()

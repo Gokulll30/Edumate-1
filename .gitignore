@@ -44,3 +44,5 @@ backend/*.pyc
 frontend/.env
 backend/.env
 
+#secret_key file
+backend/client_secret.json
