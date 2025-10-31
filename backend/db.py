@@ -1,6 +1,7 @@
 """
 MySQL helper for EduMate — robust with study session support, progress, and authentication.
 """
+
 import mysql.connector
 from mysql.connector import pooling, errors
 import os
@@ -9,16 +10,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from typing import Optional, Dict, List, Any
 from flask import g
 
-
-# MySQL connection pool
+# MySQL connection pool variable
 DB_POOL = None
-
 
 # IST time helper (India Standard Time, UTC+05:30)
 def _now_ist_iso():
     ist = timezone(timedelta(hours=5, minutes=30))
     return datetime.now(ist).isoformat()
 
+# Helper to show current DB env vars (for debugging)
+def _print_db_env_vars():
+    print("Using DB config:")
+    print(f"  MYSQL_HOST = {os.environ.get('MYSQL_HOST', 'localhost')}")
+    print(f"  MYSQL_USER = {os.environ.get('MYSQL_USER', 'root')}")
+    print(f"  MYSQL_PASSWORD = {'<not set>' if not os.environ.get('MYSQL_PASSWORD') else '<set>'}")
+    print(f"  MYSQL_DB = {os.environ.get('MYSQL_DB', 'edumate')}")
 
 # ===== CONNECTION HANDLING =====
 def init_db_pool():
@@ -30,6 +36,12 @@ def init_db_pool():
     user = os.environ.get("MYSQL_USER", "root")
     password = os.environ.get("MYSQL_PASSWORD", "")
     database = os.environ.get("MYSQL_DB", "edumate")
+
+    _print_db_env_vars()
+
+    if user == "root" and password == "":
+        # Very dangerous to run root user with empty password, raise error to remind setting env
+        print("❌ Warning: Root user is configured with empty password. Please set MYSQL_PASSWORD environment variable for security.")
 
     try:
         DB_POOL = pooling.MySQLConnectionPool(
@@ -46,7 +58,6 @@ def init_db_pool():
         print(f"❌ Database connection error: {e}")
         raise
 
-
 def get_db_connection():
     """Get database connection with proper Flask context handling"""
     if 'db' not in g:
@@ -54,21 +65,6 @@ def get_db_connection():
             init_db_pool()
         g.db = DB_POOL.get_connection()
     return g.db
-
-
-def get_conn():
-    """Fallback global connection"""
-    return get_db_connection()
-
-
-def init_db():
-    """Initialize database tables"""
-    if DB_POOL is None:
-        init_db_pool()
-    conn = DB_POOL.get_connection()
-    _ensure_tables(conn)
-    conn.close()
-
 
 # ===== TABLE CREATION =====
 def _ensure_tables(conn):
@@ -193,10 +189,17 @@ def _ensure_tables(conn):
     conn.commit()
     cur.close()
 
+def init_db():
+    """Initialize database tables"""
+    if DB_POOL is None:
+        init_db_pool()
+    conn = DB_POOL.get_connection()
+    _ensure_tables(conn)
+    conn.close()
 
 # ===== USER FUNCTIONS =====
 def create_user(username: str, email: str, password_hash: str) -> int:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     created_at = _now_ist_iso()
     cur.execute("""
@@ -212,9 +215,8 @@ def create_user(username: str, email: str, password_hash: str) -> int:
     cur.close()
     return user_id
 
-
 def get_user_by_username(username: str) -> Optional[Dict]:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("""
     SELECT id, username, email, name, password_hash, created_at
@@ -224,7 +226,6 @@ def get_user_by_username(username: str) -> Optional[Dict]:
     cur.close()
     return row
 
-
 def verify_user(username: str, password_plain: str) -> Dict:
     row = get_user_by_username(username)
     if not row:
@@ -233,10 +234,9 @@ def verify_user(username: str, password_plain: str) -> Dict:
         return {"status": "invalid_password"}
     return {"status": "ok", "user": {"id": row["id"], "username": row["username"], "name": row["name"]}}
 
-
 # ===== CHAT FUNCTIONS =====
 def get_chat_sessions(user_id: int) -> List[Dict]:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("""
     SELECT s.id, s.title, s.created_at,
@@ -247,9 +247,8 @@ def get_chat_sessions(user_id: int) -> List[Dict]:
     cur.close()
     return rows
 
-
 def create_chat_session(user_id: int, title: str = "New Chat") -> int:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("INSERT INTO sessions (user_id, title) VALUES (%s, %s)", (user_id, title))
     session_id = cur.lastrowid
@@ -257,9 +256,8 @@ def create_chat_session(user_id: int, title: str = "New Chat") -> int:
     cur.close()
     return session_id
 
-
 def delete_chat_session(session_id: int, user_id: int) -> bool:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM chats WHERE session_id = %s AND user_id = %s", (session_id, user_id))
     cur.execute("DELETE FROM sessions WHERE id = %s AND user_id = %s", (session_id, user_id))
@@ -268,9 +266,8 @@ def delete_chat_session(session_id: int, user_id: int) -> bool:
     cur.close()
     return affected_rows > 0
 
-
 def rename_chat_session(session_id: int, new_title: str, user_id: int) -> bool:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("UPDATE sessions SET title = %s WHERE id = %s AND user_id = %s",
                 (new_title, session_id, user_id))
@@ -279,10 +276,9 @@ def rename_chat_session(session_id: int, new_title: str, user_id: int) -> bool:
     cur.close()
     return affected_rows > 0
 
-
 def save_chat_message(user_id: int, role: str, message: str, session_id: int = None):
     now = _now_ist_iso()
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
     INSERT INTO chats (user_id, role, message, session_id, created_at)
@@ -291,9 +287,8 @@ def save_chat_message(user_id: int, role: str, message: str, session_id: int = N
     conn.commit()
     cur.close()
 
-
 def get_chat_history(user_id: int, limit: int = 50, session_id: int = None) -> List[Dict]:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     if session_id:
         cur.execute("""
@@ -309,12 +304,11 @@ def get_chat_history(user_id: int, limit: int = 50, session_id: int = None) -> L
     cur.close()
     return rows
 
-
 # ===== QUIZ FUNCTIONS =====
 def save_quiz_attempt(user_id: int, topic: str, difficulty: str, score: int,
                       total_questions: int, time_taken: int, username: str = None) -> int:
     percentage = int((score / total_questions) * 100) if total_questions > 0 else 0
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
     INSERT INTO quiz_attempts (user_id, username, topic, difficulty, score, total_questions, percentage, time_taken)
@@ -325,9 +319,8 @@ def save_quiz_attempt(user_id: int, topic: str, difficulty: str, score: int,
     cur.close()
     return attempt_id
 
-
 def get_quiz_history(user_id: int, limit: int = 50) -> List[Dict]:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("""
     SELECT id, topic, difficulty, score, total_questions, percentage, time_taken, taken_at
@@ -337,9 +330,8 @@ def get_quiz_history(user_id: int, limit: int = 50) -> List[Dict]:
     cur.close()
     return rows
 
-
 def get_quiz_stats(user_id: int) -> Dict:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("""
     SELECT COUNT(*) AS total_attempts, AVG(percentage) AS avg_percentage,
@@ -358,11 +350,10 @@ def get_quiz_stats(user_id: int) -> Dict:
     else:
         return {'total_attempts': 0, 'avg_percentage': 0, 'best_score': 0, 'last_attempt': None}
 
-
 # ===== STUDY SESSION FUNCTIONS =====
 def add_study_session(user_id: int, title: str, subject: str, duration: int, date: str,
                       time: str, type_: str, priority: str, notes: Optional[str] = None) -> Dict:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     created_at = _now_ist_iso()
     cur.execute("""
@@ -375,18 +366,16 @@ def add_study_session(user_id: int, title: str, subject: str, duration: int, dat
     cur.close()
     return row
 
-
 def get_study_sessions(user_id: int) -> List[Dict]:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT * FROM study_sessions WHERE user_id = %s ORDER BY date, time", (user_id,))
     rows = cur.fetchall()
     cur.close()
     return rows
 
-
 def delete_study_session(session_id: int, user_id: int) -> bool:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM study_sessions WHERE id = %s AND user_id = %s", (session_id, user_id))
     conn.commit()
@@ -394,9 +383,8 @@ def delete_study_session(session_id: int, user_id: int) -> bool:
     cur.close()
     return affected > 0
 
-
 def toggle_study_completion(session_id: int, user_id: int, force_completed: bool = None) -> Optional[Dict]:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT completed FROM study_sessions WHERE id = %s AND user_id = %s", (session_id, user_id))
     row = cur.fetchone()
@@ -415,14 +403,10 @@ def toggle_study_completion(session_id: int, user_id: int, force_completed: bool
     cur.close()
     return outrow
 
-
-
 from decimal import Decimal
-from typing import Dict, Any
-from db import get_conn
 
 def compute_progress(user_id: int) -> Dict[str, Any]:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     try:
         cur.execute("SELECT COUNT(*) AS c FROM study_sessions WHERE user_id = %s", (user_id,))
@@ -461,11 +445,9 @@ def compute_progress(user_id: int) -> Dict[str, Any]:
         "completionRate": int(round(completion_rate))
     }
 
-
-
 # ===== LOGIN SESSION =====
 def log_login(user_id: int) -> int:
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor()
     login_at = _now_ist_iso()
     cur.execute("INSERT INTO login_sessions (user_id, login_at) VALUES (%s, %s)", (user_id, login_at))
@@ -474,9 +456,8 @@ def log_login(user_id: int) -> int:
     cur.close()
     return session_id
 
-
 def log_logout(session_id: int):
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT login_at FROM login_sessions WHERE id = %s", (session_id,))
     row = cur.fetchone()
@@ -492,12 +473,11 @@ def log_logout(session_id: int):
     conn.commit()
     cur.close()
 
-
 # ===== QUIZ RETAKE SCHEDULING =====
 def schedule_quiz_retake_if_needed(user_id: int, subject: str, taken_at: str, score: int, total_questions: int):
     if total_questions == 0 or score > total_questions // 2:
         return
-    conn = get_conn()
+    conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     taken_date = datetime.fromisoformat(taken_at)
     retake_date_str = (taken_date + timedelta(days=2)).date().isoformat()
@@ -515,9 +495,9 @@ def schedule_quiz_retake_if_needed(user_id: int, subject: str, taken_at: str, sc
     conn.commit()
     cur.close()
 
-
 # ===== INITIALIZE DATABASE =====
 try:
     init_db()
 except Exception as e:
     print(f"Database initialization error: {e}")
+    # Optionally exit app or handle this error gracefully
