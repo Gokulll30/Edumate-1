@@ -1,5 +1,6 @@
 import os
 import sys
+
 from flask import Flask, jsonify, g, request
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -16,6 +17,7 @@ if APP_DIR not in sys.path:
 app = Flask(__name__)
 
 # --- CORS CONFIGURATION ---
+
 # For Render + Vercel, allow localhost and your production domains.
 CORS(
     app,
@@ -23,11 +25,12 @@ CORS(
         "http://localhost:3000",
         "http://localhost:5173",
         r"https://.*\.vercel\.app",
-        "https://edumate-2026.vercel.app"
+        "https://edumate-2026.vercel.app",
+        "https://edumate-1-mgnm.onrender.com"  # <-- Add your backend domain for production
     ],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
-    supports_credentials=False
+    supports_credentials=True   # <-- For OAuth and cookie sessions, use True
 )
 
 @app.before_request
@@ -56,6 +59,7 @@ def teardown_db(exception):
                 raise e
 
 print("\n🔧 Registering blueprints...")
+
 try:
     from auth.routes import auth_bp
     app.register_blueprint(auth_bp)
@@ -83,6 +87,17 @@ try:
     print("✅ Study blueprint registered successfully")
 except Exception as e:
     print(f"❌ Study blueprint registration failed: {e}")
+
+# ========== GOOGLE CALENDAR INTEGRATION BELOW ==========
+
+try:
+    from calendar.routes import calendar_bp
+    app.register_blueprint(calendar_bp, url_prefix="/calendar")
+    print("✅ Calendar blueprint registered successfully")
+except Exception as e:
+    print(f"❌ Calendar blueprint registration failed: {e}")
+
+# ========== END CALENDAR INTEGRATION ADDITIONS ==========
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -127,14 +142,11 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("🚀 EDUMATE BACKEND STARTING")
     print("=" * 60)
-
     print("\n📋 Registered Routes:")
     for rule in app.url_map.iter_rules():
         methods = ",".join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
-        print(f"   {rule.rule:<40} [{methods}]")
-
+        print(f" {rule.rule:<40} [{methods}]")
     port = int(os.getenv("PORT", 5001))
     print(f"\n🌟 Server starting on http://localhost:{port}")
     print("=" * 60 + "\n")
-
     app.run(host="0.0.0.0", port=port, debug=True)
