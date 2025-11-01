@@ -2,7 +2,7 @@
 Google Calendar Integration Routes
 Handles OAuth flow and calendar operations with MySQL backend
 """
-
+import requests
 from db import get_user_email_by_id, get_db_connection
 from flask import Blueprint, request, jsonify, redirect, session
 from google.oauth2.credentials import Credentials

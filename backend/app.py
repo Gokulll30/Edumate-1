@@ -1,6 +1,6 @@
 import os
 import sys
-
+import requests
 from flask import Flask, jsonify, g, request
 from flask_cors import CORS
 from dotenv import load_dotenv
