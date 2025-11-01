@@ -258,6 +258,14 @@ def get_user_by_username(username: str) -> Optional[Dict]:
     row = cur.fetchone()
     cur.close()
     return row
+def get_user_email_by_id(user_id: int) -> str:
+    conn = get_db_connection()
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT email FROM users WHERE id = %s", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    return row['email'] if row else None
+
 
 def verify_user(username: str, password_plain: str) -> Dict:
     row = get_user_by_username(username)
