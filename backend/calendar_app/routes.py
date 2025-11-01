@@ -31,7 +31,7 @@ else:
 with open(CLIENT_SECRETS_FILE) as f:
     secret = json.load(f)
 
-REDIRECT_URI = os.environ.get('REDIRECT_URI', 'https://edumate-1-mgnm.onrender.com/calendar_app/oauth2callback')
+REDIRECT_URI = os.environ.get('REDIRECT_URI', 'https://edumate-2026.vercel.app/calendar_app/oauth2callback')
 # ===== OAUTH ROUTES =====
 
 @calendar_bp.route('/connect', methods=['GET'])
