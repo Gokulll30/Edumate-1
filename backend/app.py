@@ -91,8 +91,8 @@ except Exception as e:
 # ========== GOOGLE CALENDAR INTEGRATION BELOW ==========
 
 try:
-    from calendar.routes import calendar_bp
-    app.register_blueprint(calendar_bp, url_prefix="/calendar")
+    from calendar_app.routes import calendar_bp
+    app.register_blueprint(calendar_bp, url_prefix="/calendar_app")
     print("✅ Calendar blueprint registered successfully")
 except Exception as e:
     print(f"❌ Calendar blueprint registration failed: {e}")
