@@ -123,7 +123,7 @@ export default function StudyPlanner() {
       if (!user) return;
 
       try {
-        const res = await fetch(`${API_BASE}/calendar/check-connection?userId=${encodeURIComponent(user.id)}`);
+        const res = await fetch(`${API_BASE}/calendar_app/check-connection?userId=${encodeURIComponent(user.id)}`);
         const data = await res.json();
 
         if (data.success) {
@@ -153,7 +153,7 @@ export default function StudyPlanner() {
 
     try {
       const res = await fetch(
-        `${API_BASE}/calendar/connect?userId=${encodeURIComponent(user.id)}`
+        `${API_BASE}/calendar_app/connect?userId=${encodeURIComponent(user.id)}`
       );
       const data = await res.json();
 
@@ -178,7 +178,7 @@ export default function StudyPlanner() {
 
               // Recheck connection status
               const statusRes = await fetch(
-                `${API_BASE}/calendar/check-connection?userId=${encodeURIComponent(user.id)}`
+                `${API_BASE}/calendar_app/check-connection?userId=${encodeURIComponent(user.id)}`
               );
               const statusData = await statusRes.json();
 
@@ -218,7 +218,7 @@ export default function StudyPlanner() {
     setCalendarError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/calendar/disconnect`, {
+      const res = await fetch(`${API_BASE}/calendar_app/disconnect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id })
@@ -322,7 +322,7 @@ export default function StudyPlanner() {
         let calendarSuccess = false;
         if (calendarStatus.connected) {
           try {
-            const calendarRes = await fetch(`${API_BASE}/calendar/create-event`, {
+            const calendarRes = await fetch(`${API_BASE}/calendar_app/create-event`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -423,7 +423,7 @@ export default function StudyPlanner() {
         if (calendarStatus.connected && session?.calendar_event_id) {
           try {
             await fetch(
-              `${API_BASE}/calendar/delete-event?userId=${encodeURIComponent(user.id)}&eventId=${session.calendar_event_id}`,
+              `${API_BASE}/calendar_app/delete-event?userId=${encodeURIComponent(user.id)}&eventId=${session.calendar_event_id}`,
               { method: 'DELETE' }
             );
           } catch (calErr) {
