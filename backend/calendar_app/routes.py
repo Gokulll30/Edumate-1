@@ -2,7 +2,7 @@
 Google Calendar Integration Routes
 Handles OAuth flow and calendar operations
 """
-
+from db import get_user_email_by_id
 from flask import Blueprint, request, jsonify, redirect, session, g, current_app
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -41,11 +41,11 @@ def get_db():
 def connect_calendar():
     """Initiate OAuth flow"""
     user_id = request.args.get('userId')
-    user_email = request.args.get('userEmail')
-    
-    if not user_id or not user_email:
-        return jsonify({'success': False, 'error': 'User ID and email required'}), 400
-    
+    if not user_id:
+        return jsonify({'success': False, 'error': 'User ID required'}), 400
+    email = get_user_email_by_id(int(user_id))
+    if not email:
+        return jsonify({'success': False, 'error': 'Email not found for user'}), 404
     try:
         flow = Flow.from_client_secrets_file(
             CLIENT_SECRETS_FILE,

@@ -153,7 +153,7 @@ export default function StudyPlanner() {
 
     try {
       const res = await fetch(
-        `${API_BASE}/calendar_app/connect?userId=${encodeURIComponent(user.id)}&userEmail=${encodeURIComponent(user.username)}`
+        `${API_BASE}/calendar_app/connect?userId=${encodeURIComponent(user.id)}`
       );
       const data = await res.json();
 
