@@ -13,7 +13,7 @@ import sqlite3
 import json
 import os
 
-calendar_bp = Blueprint('calendar', __name__, url_prefix='/calendar')
+calendar_bp = Blueprint('calendar', __name__, url_prefix='/calendar_app')
 
 # OAuth Configuration
 SCOPES = [
