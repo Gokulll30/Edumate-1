@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/calendar_app/:path*",
+      "destination": "https://edumate-1-mgnm.onrender.com/calendar_app/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
