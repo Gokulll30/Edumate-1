@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import json
 import os
 
-calendar_bp = Blueprint('calendar', __name__, url_prefix='/calendar_app')
+calendar_bp = Blueprint('calendar', __name__, url_prefix='/calendar')
 
 # OAuth Configuration
 SCOPES = [
@@ -23,7 +23,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email'
 ]
 CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), '..', 'client_secret.json')
-REDIRECT_URI = os.environ.get('REDIRECT_URI', 'http://localhost:5001/calendar_app/oauth2callback')
+REDIRECT_URI = os.environ.get('REDIRECT_URI', 'http://localhost:5001/calendar/oauth2callback')
 
 # ===== OAUTH ROUTES =====
 
