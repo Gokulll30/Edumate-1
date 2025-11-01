@@ -22,9 +22,16 @@ SCOPES = [
     'openid',
     'https://www.googleapis.com/auth/userinfo.email'
 ]
-CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), '..', 'client_secret.json')
-REDIRECT_URI = os.environ.get('REDIRECT_URI', 'http://localhost:5001/calendar_app/oauth2callback')
+# Try secret files path first (works on Render production)
+if os.path.exists('/etc/secrets/client_secret.json'):
+    CLIENT_SECRETS_FILE = '/etc/secrets/client_secret.json'
+else:
+    # fallback for local/dev
+    CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), '..', 'client_secret.json')
+with open(CLIENT_SECRETS_FILE) as f:
+    secret = json.load(f)
 
+REDIRECT_URI = secret['web']['redirect_uris'][0]
 # ===== OAUTH ROUTES =====
 
 @calendar_bp.route('/connect', methods=['GET'])
