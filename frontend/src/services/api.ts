@@ -33,7 +33,6 @@ export interface QuizResult {
   time_taken?: number;
 }
 
-// For full result with answers
 export interface QuizQnA {
   question: string;
   correct_answer: string;
@@ -43,8 +42,10 @@ export interface QuizQnA {
 }
 
 export interface SaveQuizResultWithAnswersRequest extends QuizResult {
+  user_id?: number; // <-- add this line (optional or required, to match backend)
   qnas: QuizQnA[];
 }
+
 
 export interface QuizAttempt {
   id: number;
@@ -118,15 +119,15 @@ export interface ChatSession {
 }
 
 // API Base URL
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
+export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 // Helper function to get auth token
-const getAuthToken = (): string | null => {
+export const getAuthToken = (): string | null => {
   return localStorage.getItem('authToken');
 };
 
 // Helper function to get auth headers
-const getAuthHeaders = () => {
+export const getAuthHeaders = (): Record<string, string> => {
   const token = getAuthToken();
   return {
     'Content-Type': 'application/json',
@@ -212,10 +213,8 @@ export const logout = async (): Promise<{ success: boolean }> => {
   } catch (error) {
     console.error('Logout error:', error);
   } finally {
-    // Always clear local storage
     localStorage.removeItem('authToken');
   }
-  
   return { success: true };
 };
 
@@ -236,7 +235,7 @@ export const verifyToken = async (): Promise<{ valid: boolean; user?: User; erro
     const result = await response.json();
 
     if (!response.ok) {
-      localStorage.removeItem('authToken'); // Clear invalid token
+      localStorage.removeItem('authToken');
       return { valid: false, error: result.error || 'Token verification failed' };
     }
 
@@ -244,9 +243,9 @@ export const verifyToken = async (): Promise<{ valid: boolean; user?: User; erro
   } catch (error) {
     console.error('Token verification error:', error);
     localStorage.removeItem('authToken');
-    return { 
-      valid: false, 
-      error: error instanceof Error ? error.message : 'Token verification failed' 
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Token verification failed'
     };
   }
 };
@@ -462,7 +461,7 @@ export async function getUserQuizStats(username: string): Promise<{
 }> {
   try {
     const response = await fetch(`${API_BASE}/quiz/user-stats/${username}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
@@ -500,7 +499,11 @@ export const getLeaderboard = async (): Promise<{ success: boolean; leaderboard:
 
 // ===== CHAT API =====
 
-export const sendChatMessage = async (message: string, sessionId?: number, fileText?: string): Promise<{
+export const sendChatMessage = async (
+  message: string,
+  sessionId?: number,
+  fileText?: string
+): Promise<{
   success: boolean;
   reply?: string;
   session_id?: number;
@@ -531,7 +534,10 @@ export const sendChatMessage = async (message: string, sessionId?: number, fileT
   }
 };
 
-export const getChatHistory = async (sessionId?: number, limit: number = 50): Promise<{
+export const getChatHistory = async (
+  sessionId?: number,
+  limit: number = 50
+): Promise<{
   success: boolean;
   history: ChatMessage[];
   error?: string;
@@ -642,7 +648,10 @@ export const deleteChatSession = async (sessionId: number): Promise<{
   }
 };
 
-export const renameChatSession = async (sessionId: number, title: string): Promise<{
+export const renameChatSession = async (
+  sessionId: number,
+  title: string
+): Promise<{
   success: boolean;
   error?: string;
 }> => {
@@ -667,7 +676,9 @@ export const renameChatSession = async (sessionId: number, title: string): Promi
   }
 };
 
-export const uploadChatFile = async (file: File): Promise<{
+export const uploadChatFile = async (
+  file: File
+): Promise<{
   success: boolean;
   fileText?: string;
   filename?: string;
@@ -721,8 +732,14 @@ export const getCurrentUserFromToken = (): { id: number; username: string } | nu
   if (!token) return null;
 
   try {
-    // Decode JWT payload (basic decoding - don't use for security validation)
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    // Decode JWT payload (basic decoding - do NOT use for security validation)
+    const payloadJson = decodeURIComponent(
+      atob(token.split('.')[1])
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(payloadJson);
     return { id: payload.id, username: payload.username };
   } catch (error) {
     console.error('Error decoding token:', error);

@@ -1,18 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Brain, Clock, CheckCircle, XCircle, BarChart, Trophy } from 'lucide-react';
-import { uploadFile, checkAnswer, saveQuizResultWithAnswers } from '../services/api';
+import {
+  uploadFile,
+  checkAnswer,
+  saveQuizResultWithAnswers,
+  SaveQuizResultWithAnswersRequest,
+  QuizItem,
+} from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-
-interface Question {
-  question: string;
-  options: string[];
-  answerIndex: number;
-  answerLetter: string;
-  explanation: string;
-  difficulty: string;
-  topic: string;
-}
 
 interface Feedback {
   correct: boolean;
@@ -30,7 +26,7 @@ export default function QuizGenerator() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [quiz, setQuiz] = useState<Question[]>([]);
+  const [quiz, setQuiz] = useState<QuizItem[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -46,7 +42,7 @@ export default function QuizGenerator() {
   const query = useQuery();
   const subjectFromUrl = query.get('subject');
 
-  // Array of user's selected answers for each question (index = question number)
+  // User answers array (index=question number)
   const [userAnswers, setUserAnswers] = useState<Array<number | null>>([]);
 
   useEffect(() => {
@@ -56,7 +52,6 @@ export default function QuizGenerator() {
     }
   }, [subjectFromUrl]);
 
-  // On new quiz, reset answer array
   useEffect(() => {
     setUserAnswers(Array(quiz.length).fill(null));
   }, [quiz.length]);
@@ -110,7 +105,7 @@ export default function QuizGenerator() {
       const result = await checkAnswer({
         quiz,
         questionIndex: currentQuestion,
-        selectedIndex: selectedAnswer
+        selectedIndex: selectedAnswer,
       });
       if (result.success) {
         setFeedback(result);
@@ -120,7 +115,7 @@ export default function QuizGenerator() {
           newAnswers[currentQuestion] = selectedAnswer;
           return newAnswers;
         });
-        if (result.correct) setScore(prev => prev + 1);
+        if (result.correct) setScore((prev) => prev + 1);
       }
     } catch {
       alert('Failed to check answer');
@@ -129,7 +124,7 @@ export default function QuizGenerator() {
 
   const nextQuestion = () => {
     if (currentQuestion < quiz.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
+      setCurrentQuestion((prev) => prev + 1);
       setSelectedAnswer(userAnswers[currentQuestion + 1] ?? null);
       setFeedback(null);
       setShowAnswer(false);
@@ -139,36 +134,40 @@ export default function QuizGenerator() {
     }
   };
 
-  // Save result with all relevant fields once the quiz is completed
   const saveQuizScore = async () => {
-    if (!user?.username || quizSaved) return;
+    if (!user?.id || !user?.username || quizSaved) return;
+
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-    // For each question, get user answer from userAnswers array
+    // Build QnA array for quiz answers
     const qnas = quiz.map((q, idx) => {
       const userAnswerIndex = userAnswers[idx];
       return {
         question: q.question,
         correct_answer: q.options[q.answerIndex],
-        user_answer: userAnswerIndex !== null ? q.options[userAnswerIndex] : '', 
+        user_answer: userAnswerIndex !== null ? q.options[userAnswerIndex] : '',
         is_correct: userAnswerIndex === q.answerIndex,
-        explanation: q.explanation || ''
+        explanation: q.explanation || '',
       };
     });
 
+    // Complete payload matching SaveQuizResultWithAnswersRequest interface
+    const payload: SaveQuizResultWithAnswersRequest = {
+      user_id: Number(user.id),
+      username: user.username,
+      score,
+      total_questions: quiz.length,
+      topic: quiz.length > 0 ? quiz[0].topic : (preselectedSubject || 'General'),
+      difficulty,
+      time_taken: timeSpent,
+      qnas,
+    };
+
     try {
-      await saveQuizResultWithAnswers({
-        username: user.username,
-        score,
-        total_questions: quiz.length,
-        topic: quiz.length > 0 ? quiz[0].topic : (preselectedSubject || 'General'),
-        difficulty,
-        time_taken: timeSpent,
-        qnas
-      });
+      await saveQuizResultWithAnswers(payload);
       setQuizSaved(true);
-    } catch {
-      console.error('Failed to save quiz result');
+    } catch (err) {
+      console.error('Failed to save quiz result', err);
     }
   };
 
@@ -209,7 +208,7 @@ export default function QuizGenerator() {
           <Brain className="mr-3 h-8 w-8 text-blue-500" />
           <h1 className="text-3xl font-bold">AI Quiz Generator</h1>
         </div>
-        
+
         {preselectedSubject && (
           <p className="text-yellow-400 mb-4">
             Preselected Subject: <strong>{preselectedSubject}</strong>
@@ -384,7 +383,7 @@ export default function QuizGenerator() {
                     <XCircle className="h-5 w-5 text-red-500" />
                   )}
                   <span className="font-medium">
-                    {feedback.correct ? "✅ Correct!" : "❌ Incorrect"}
+                    {feedback.correct ? '✅ Correct!' : '❌ Incorrect'}
                   </span>
                 </div>
                 <p className="mb-2">
@@ -432,7 +431,7 @@ export default function QuizGenerator() {
                 Take Another Quiz
               </button>
               <button
-                onClick={() => window.location.href = '/quiz-performance'}
+                onClick={() => (window.location.href = '/quiz-performance')}
                 className="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2"
               >
                 <BarChart className="h-5 w-5" />
