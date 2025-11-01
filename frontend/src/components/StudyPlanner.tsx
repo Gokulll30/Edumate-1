@@ -573,7 +573,7 @@ export default function StudyPlanner() {
                     <li>• Automatic event creation when you schedule sessions</li>
                     <li>• Reminders 1 day, 30 minutes, and 10 minutes before</li>
                     <li>• Updates when you modify or delete sessions</li>
-                    <li>• Uses your login email: {user?.username}</li>
+                    <li>• Uses your login email: {user?.email}</li>
                   </ul>
                 </div>
 
