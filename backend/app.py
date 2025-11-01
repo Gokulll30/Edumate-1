@@ -15,6 +15,11 @@ if APP_DIR not in sys.path:
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "407e6953e465af96b5924046abf3a16adfbae2cd20864d9eeb913e6b252221b3")
+app.config.update(
+    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_SECURE=True,
+)
+
 # --- CORS CONFIGURATION ---
 
 # For Render + Vercel, allow localhost and your production domains.
