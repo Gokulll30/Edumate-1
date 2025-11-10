@@ -46,7 +46,7 @@ def init_db_pool():
     try:
         DB_POOL = pooling.MySQLConnectionPool(
             pool_name="edumate_pool",
-            pool_size=5,
+            pool_size=2,
             host=host,
             user=user,
             password=password,
@@ -136,12 +136,19 @@ def _ensure_tables(conn):
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sessions (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
+        user_id INT,
         title VARCHAR(255) NOT NULL DEFAULT 'New Chat',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
     """)
+
+    # Ensure user_id column allows NULL (in case older schema had NOT NULL)
+    try:
+        cur.execute("ALTER TABLE sessions MODIFY COLUMN user_id INT NULL")
+    except Exception:
+        # Ignore errors (column may already be nullable or DB permissions may prevent alteration)
+        pass
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS chats (
@@ -288,7 +295,29 @@ def get_chat_sessions(user_id: int) -> List[Dict]:
     cur.close()
     return rows
 
-def create_chat_session(user_id: int, title: str = "New Chat") -> int:
+
+def get_chat_sessions_by_ids(ids: List[int]) -> List[Dict]:
+    """
+    Fetch session rows for the given list of session IDs regardless of user_id.
+    Useful for anonymous users who keep a local list of session ids in localStorage.
+    """
+    if not ids:
+        return []
+    conn = get_db_connection()
+    cur = conn.cursor(dictionary=True)
+    # Build placeholders for parameterized IN clause
+    placeholders = ",".join(["%s"] * len(ids))
+    query = f"""
+    SELECT s.id, s.title, s.created_at,
+    (SELECT COUNT(*) FROM chats WHERE session_id = s.id) AS message_count
+    FROM sessions s WHERE s.id IN ({placeholders}) ORDER BY s.created_at DESC
+    """
+    cur.execute(query, tuple(ids))
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+def create_chat_session(user_id: Optional[int], title: str = "New Chat") -> int:
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("INSERT INTO sessions (user_id, title) VALUES (%s, %s)", (user_id, title))
@@ -298,10 +327,30 @@ def create_chat_session(user_id: int, title: str = "New Chat") -> int:
     return session_id
 
 def delete_chat_session(session_id: int, user_id: int) -> bool:
+    """
+    Delete a session and its chats for the given user_id.
+    Returns True if a session row was deleted.
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM chats WHERE session_id = %s AND user_id = %s", (session_id, user_id))
     cur.execute("DELETE FROM sessions WHERE id = %s AND user_id = %s", (session_id, user_id))
+    affected_rows = cur.rowcount
+    conn.commit()
+    cur.close()
+    return affected_rows > 0
+
+
+def delete_chat_session_anonymous(session_id: int) -> bool:
+    """
+    Delete a session and its chats for anonymous sessions (user_id IS NULL).
+    This allows the client to remove sessions it created locally without auth.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Delete chats tied to the anonymous session
+    cur.execute("DELETE FROM chats WHERE session_id = %s AND user_id IS NULL", (session_id,))
+    cur.execute("DELETE FROM sessions WHERE id = %s AND user_id IS NULL", (session_id,))
     affected_rows = cur.rowcount
     conn.commit()
     cur.close()
@@ -317,7 +366,7 @@ def rename_chat_session(session_id: int, new_title: str, user_id: int) -> bool:
     cur.close()
     return affected_rows > 0
 
-def save_chat_message(user_id: int, role: str, message: str, session_id: int = None):
+def save_chat_message(user_id: Optional[int], role: str, message: str, session_id: int = None):
     now = _now_ist_iso()
     conn = get_db_connection()
     cur = conn.cursor()
@@ -328,19 +377,50 @@ def save_chat_message(user_id: int, role: str, message: str, session_id: int = N
     conn.commit()
     cur.close()
 
-def get_chat_history(user_id: int, limit: int = 50, session_id: int = None) -> List[Dict]:
+
+def get_session_by_id(session_id: int) -> Optional[Dict]:
+    conn = get_db_connection()
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT id, user_id, title, created_at FROM sessions WHERE id = %s", (session_id,))
+    row = cur.fetchone()
+    cur.close()
+    return row
+
+
+def set_session_title(session_id: int, title: str) -> bool:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE sessions SET title = %s WHERE id = %s", (title, session_id))
+    affected = cur.rowcount
+    conn.commit()
+    cur.close()
+    return affected > 0
+
+def get_chat_history(user_id: Optional[int], limit: int = 50, session_id: int = None) -> List[Dict]:
     conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
     if session_id:
-        cur.execute("""
-        SELECT * FROM chats WHERE user_id = %s AND session_id = %s
-        ORDER BY created_at ASC LIMIT %s
-        """, (user_id, session_id, limit))
+        if user_id is not None:
+            cur.execute("""
+            SELECT * FROM chats WHERE user_id = %s AND session_id = %s
+            ORDER BY created_at ASC LIMIT %s
+            """, (user_id, session_id, limit))
+        else:
+            # Fetch by session_id only (for anonymous or shared sessions)
+            cur.execute("""
+            SELECT * FROM chats WHERE session_id = %s
+            ORDER BY created_at ASC LIMIT %s
+            """, (session_id, limit))
     else:
-        cur.execute("""
-        SELECT * FROM chats WHERE user_id = %s
-        ORDER BY created_at DESC LIMIT %s
-        """, (user_id, limit))
+        if user_id is not None:
+            cur.execute("""
+            SELECT * FROM chats WHERE user_id = %s
+            ORDER BY created_at DESC LIMIT %s
+            """, (user_id, limit))
+        else:
+            # No user_id and no session_id: return empty
+            cur.close()
+            return []
     rows = cur.fetchall()
     cur.close()
     return rows

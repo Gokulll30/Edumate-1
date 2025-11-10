@@ -2,7 +2,7 @@ import os
 from groq import Groq
 from dotenv import load_dotenv
 from typing import Optional
-from db import save_chat_message
+from db import save_chat_message, get_session_by_id, set_session_title
 
 # Load environment variables
 load_dotenv()
@@ -54,7 +54,7 @@ def clear_chat_history():
     global chat_history
     chat_history = []
 
-def get_chat_response(message: str, user_id: Optional[int]) -> str:
+def get_chat_response(message: str, user_id: Optional[int], session_id: Optional[int] = None) -> str:
     """
     Main entrypoint used by the Flask route.
     - message: full user message (may include appended fileText context)
@@ -65,17 +65,42 @@ def get_chat_response(message: str, user_id: Optional[int]) -> str:
     try:
         # Save the user message in DB (role 'user')
         try:
-            save_chat_message(user_id, "user", message)
+            save_chat_message(user_id, "user", message, session_id)
         except Exception as e:
             # log but continue — we still want to return a reply
             print("Warning: failed to save user message:", e)
+
+        # After saving the user message, try to generate a short session title
+        # from the user's first message so the UI shows a meaningful name.
+        try:
+            if session_id is not None:
+                sess = get_session_by_id(session_id)
+                if sess and (not sess.get('title') or sess.get('title') == 'New Chat'):
+                    # Simple heuristic: take up to first 6 words, remove newlines, limit length
+                    def _make_title(text: str) -> str:
+                        s = text.strip().split('\n')[0]
+                        words = s.split()
+                        title = ' '.join(words[:6])
+                        if len(title) > 40:
+                            title = title[:40].rstrip() + '..'
+                        # sanitize
+                        return title.replace("'", "").replace('"', '')
+
+                    gen = _make_title(message)
+                    if gen:
+                        try:
+                            set_session_title(session_id, gen)
+                        except Exception as e:
+                            print("Warning: failed to set session title:", e)
+        except Exception as e:
+            print("Warning while generating session title:", e)
 
         # Generate reply using Groq
         bot_reply = get_groq_response(message)
 
         # Save bot reply in DB (role 'bot')
         try:
-            save_chat_message(user_id, "bot", bot_reply)
+            save_chat_message(user_id, "bot", bot_reply, session_id)
         except Exception as e:
             print("Warning: failed to save bot message:", e)
 

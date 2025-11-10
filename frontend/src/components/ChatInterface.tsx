@@ -1,7 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import Navigation from "./Navigation";
-import { Send, Paperclip, Mic, Bot, User, Sparkles } from "lucide-react";
+import { Send, Paperclip, Mic, Bot, User, Sparkles, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import {
+  sendChatMessage,
+  getChatHistory as apiGetChatHistory,
+  uploadChatFile,
+  getChatSessions as apiGetChatSessions,
+  createChatSession as apiCreateChatSession,
+  deleteChatSession as apiDeleteChatSession,
+} from "../services/api";
 
 interface Message {
   id: string;
@@ -11,6 +19,13 @@ interface Message {
   attachments?: string[];
 }
 
+interface LocalSession {
+  id: number | string; // number for saved DB sessions, string like 'temp-...' for unsaved
+  title: string;
+  message_count: number;
+  created_at: string;
+  saved?: boolean; // whether persisted in DB
+}
 export default function ChatInterface() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
@@ -25,6 +40,8 @@ export default function ChatInterface() {
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [typingContent, setTypingContent] = useState("");
+  const [sessions, setSessions] = useState<LocalSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<number | string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,35 +53,103 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages, typingContent]);
 
-  // ✅ Fetch chat history from backend when component mounts
+  // Load chat sessions for the authenticated user (or anonymous fallback)
   useEffect(() => {
-    const fetchHistory = async () => {
+    const loadSessions = async () => {
       try {
-        const res = await fetch("https://edumate-1-mgnm.onrender.com/chat/history", {
-          headers: {
-            ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-          },
-        });
-        if (!res.ok) throw new Error("Failed to load chat history");
-        const data = await res.json();
+        const res = await apiGetChatSessions();
+        if (res && res.success) {
+          const list = (res.sessions || []).map((s: any) => ({ ...s, id: Number(s.id), saved: true }));
+          setSessions(list);
+          if (list.length > 0) {
+            setCurrentSessionId(Number(list[0].id));
+            return;
+          }
+        }
 
-        // Backend returns { history: [...] }
-        const history: Message[] = (data.history || []).map((msg: any) => ({
-          id: msg.id.toString(),
-          type: msg.role === "user" ? "user" : "bot",
-          content: msg.content,
-          timestamp: new Date(msg.timestamp),
-        }));
-
-        setMessages((prev) => [...prev, ...history]);
+        // If no sessions, create an *unsaved* local session (don't persist to DB yet).
+        const temp = {
+          id: `temp-${Date.now()}`,
+          title: 'New Chat',
+          message_count: 0,
+          created_at: new Date().toISOString(),
+          saved: false,
+        } as LocalSession;
+        setSessions([temp]);
+        setCurrentSessionId(temp.id);
       } catch (err) {
-        console.error("Error loading chat history:", err);
+        console.error("Error loading sessions:", err);
       }
     };
 
-    fetchHistory();
-  }, [user?.token]);
+    loadSessions();
+  }, [user]);
 
+  // Load history whenever the current session changes using the centralized helper
+  useEffect(() => {
+    if (!currentSessionId) return;
+    loadHistoryForId(currentSessionId);
+  }, [currentSessionId]);
+
+  // Helper to load history for a session id (number or temp string)
+  const loadHistoryForId = async (id: number | string | null) => {
+    if (!id) return;
+    try {
+      if (typeof id === 'string' && id.startsWith('temp-')) {
+        setMessages([
+          {
+            id: Date.now().toString(),
+            type: "bot",
+            content:
+              "Hello! I'm your AI study assistant. I can help you create study plans, generate quizzes from your materials, set reminders, and answer questions about your subjects. What would you like to work on today?",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      const data = await apiGetChatHistory(Number(id));
+      if (!data || !data.success) {
+        return;
+      }
+
+      const history: Message[] = (data.history || []).map((msg: any) => ({
+        id: String(msg.id),
+        type: msg.role === "user" ? "user" : "bot",
+        content: msg.message || msg.content || "",
+        timestamp: new Date(msg.created_at || msg.timestamp),
+      }));
+
+      setMessages(history.length ? history : [
+        {
+          id: Date.now().toString(),
+          type: "bot",
+          content:
+            "Hello! I'm your AI study assistant. I can help you create study plans, generate quizzes from your materials, set reminders, and answer questions about your subjects. What would you like to work on today?",
+          timestamp: new Date(),
+        },
+      ]);
+    } catch (err) {
+      console.error('Error loading history for id', id, err);
+    }
+  };
+
+    // Load persisted session id for anonymous users
+    useEffect(() => {
+      try {
+        // prefer stored array of ids (most recent first)
+        const storedList = localStorage.getItem('chatSessionIds');
+        if (storedList) {
+          const ids: number[] = JSON.parse(storedList) || [];
+          if (ids.length > 0 && !currentSessionId) {
+            setCurrentSessionId(Number(ids[0]));
+          }
+        } else {
+          const sid = localStorage.getItem('chatSessionId');
+          if (sid && !currentSessionId) setCurrentSessionId(Number(sid));
+        }
+      } catch (_) {}
+    }, []);
   const animateBotReply = (fullText: string) => {
     setTypingContent("");
     setIsTyping(true);
@@ -96,23 +181,71 @@ export default function ChatInterface() {
     setIsTyping(true);
 
     try {
-      const res = await fetch("https://edumate-1-mgnm.onrender.com/chat/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-        },
-        body: JSON.stringify({ message: userMessage.content }),
-      });
+      let sessionIdToUse: number | undefined = undefined;
 
-      if (!res.ok) throw new Error("Failed to fetch bot reply");
+      // If current session is a temp local session, create it in DB now
+      if (typeof currentSessionId === 'string' && currentSessionId.startsWith('temp-')) {
+        const created = await apiCreateChatSession();
+        if (!created || !created.success || !created.session_id) {
+          throw new Error('Failed to create session');
+        }
+  const sid = created.session_id as number;
+  sessionIdToUse = sid;
 
-      const data = await res.json();
-      let botReply: string = data.reply || "";
-      botReply = botReply.replace(/\*/g, "");
+        // Replace the temp session in our local list with the persisted one
+        setSessions((prev) => {
+          const rest = prev.filter((p) => p.id !== currentSessionId);
+          const newSession: LocalSession = {
+            id: sid,
+            title: 'New Chat',
+            message_count: 0,
+            created_at: new Date().toISOString(),
+            saved: true,
+          };
+          return [newSession, ...rest];
+        });
+
+        // Persist id list for anonymous sessions
+        try {
+          const stored = localStorage.getItem('chatSessionIds');
+          let ids: number[] = stored ? JSON.parse(stored) || [] : [];
+          if (!ids.includes(sessionIdToUse)) {
+            ids.unshift(sessionIdToUse);
+            ids = ids.slice(0, 50);
+            localStorage.setItem('chatSessionIds', JSON.stringify(ids));
+          }
+        } catch (_) {}
+
+        setCurrentSessionId(sessionIdToUse);
+      } else if (typeof currentSessionId === 'number') {
+        sessionIdToUse = currentSessionId;
+      } else if (typeof currentSessionId === 'string') {
+        // maybe a numeric string; try to coerce
+        const n = Number(currentSessionId);
+        if (!isNaN(n)) sessionIdToUse = n;
+      }
+
+      const data = await sendChatMessage(userMessage.content, sessionIdToUse ?? undefined);
+      if (!data || !data.success) throw new Error(data.error || 'Failed to fetch bot reply');
+
+      let botReply: string = data.reply || '';
+      botReply = botReply.replace(/\*/g, '');
+
+      // After send, refresh sessions to pick up any server-side title updates
+      try {
+        const list = await apiGetChatSessions();
+        if (list && list.success) setSessions((prev) => {
+          const server = (list.sessions || []).map((s: any) => ({ ...s, id: Number(s.id), saved: true }));
+          const temps = prev.filter((p) => typeof p.id === 'string' && String(p.id).startsWith('temp-'));
+          return [...server, ...temps];
+        });
+      } catch (err) {
+        console.error('Failed to refresh sessions after send:', err);
+      }
+
       animateBotReply(botReply);
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error('Error sending message:', error);
       setIsTyping(false);
     }
   };
@@ -132,18 +265,9 @@ export default function ChatInterface() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("https://edumate-1-mgnm.onrender.com/upload", {
-        method: "POST",
-        headers: {
-          ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-        },
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("File upload failed");
-
-      const data = await res.json();
-      const fileContent: string = data.content || "";
+      const data = await uploadChatFile(file);
+      if (!data || !data.success) throw new Error(data.error || "File upload failed");
+      const fileContent: string = data.fileText || "";
 
       const fileMessage: Message = {
         id: Date.now().toString(),
@@ -178,8 +302,7 @@ export default function ChatInterface() {
   return (
     <div className="min-h-screen bg-gray-900">
       <Navigation />
-
-      <main className="ml-64 flex flex-col h-screen">
+  <main className="ml-64 flex flex-col h-screen">
         {/* Header */}
         <div className="bg-slate-900 border-b border-slate-700 p-6">
           <div className="flex items-center space-x-3">
@@ -192,8 +315,160 @@ export default function ChatInterface() {
             </div>
           </div>
         </div>
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gray-900">
+        <div className="flex flex-1">
+          {/* Left: Chat sessions sidebar */}
+          <aside className="w-56 min-w-[14rem] border-r border-slate-800 bg-slate-900 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-semibold">Chats</h2>
+              <button
+                onClick={() => {
+                  // Create a local unsaved session. It will only be persisted when the user sends
+                  // the first message in that session.
+                  try {
+                    const temp = {
+                      id: `temp-${Date.now()}`,
+                      title: 'New Chat',
+                      message_count: 0,
+                      created_at: new Date().toISOString(),
+                      saved: false,
+                    } as LocalSession;
+                    setSessions((prev) => [temp, ...(prev || [])]);
+                    setCurrentSessionId(temp.id);
+                    setMessages([
+                      {
+                        id: Date.now().toString(),
+                        type: "bot",
+                        content:
+                          "Hello! I'm your AI study assistant. I can help you create study plans, generate quizzes from your materials, set reminders, and answer questions about your subjects. What would you like to work on today?",
+                        timestamp: new Date(),
+                      },
+                    ]);
+                  } catch (err) {
+                    console.error("Create temp session error:", err);
+                  }
+                }}
+                className="text-sm text-slate-200 bg-slate-800 px-2 py-1 rounded hover:bg-slate-700"
+              >
+                New
+              </button>
+            </div>
+            <div className="space-y-2 overflow-y-auto">
+              {sessions.map((s) => (
+                <div
+                  key={String(s.id)}
+                  onClick={async () => {
+                    // normalize numeric-like ids
+                    let selected: number | string = s.id;
+                    if (typeof s.id === 'string' && !s.id.startsWith('temp-')) {
+                      const n = Number(s.id);
+                      selected = isNaN(n) ? s.id : n;
+                    }
+                    setCurrentSessionId(selected);
+                    // load history immediately for better UX
+                    await loadHistoryForId(selected);
+                  }}
+                  className={`p-2 rounded cursor-pointer hover:bg-slate-800 flex items-center justify-between ${
+                    String(s.id) === String(currentSessionId) ? "bg-slate-800" : ""
+                  }`}
+                >
+                  <div>
+                    <div className="text-sm text-slate-200">{s.title || "New Chat"}</div>
+                    <div className="text-xs text-slate-500">{s.message_count || 0} messages</div>
+                  </div>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        // If this is an unsaved local session, just remove locally
+                        if (typeof s.id === 'string' && String(s.id).startsWith('temp-')) {
+                          setSessions((prev) => prev.filter((p) => String(p.id) !== String(s.id)));
+                          if (String(s.id) === String(currentSessionId)) {
+                            // open a fresh new temp session
+                            const temp = {
+                              id: `temp-${Date.now()}`,
+                              title: 'New Chat',
+                              message_count: 0,
+                              created_at: new Date().toISOString(),
+                              saved: false,
+                            } as LocalSession;
+                            setSessions((prev) => [temp, ...(prev || [])]);
+                            setCurrentSessionId(temp.id);
+                            setMessages([
+                              {
+                                id: Date.now().toString(),
+                                type: "bot",
+                                content:
+                                  "Hello! I'm your AI study assistant. I can help you create study plans, generate quizzes from your materials, set reminders, and answer questions about your subjects. What would you like to work on today?",
+                                timestamp: new Date(),
+                              },
+                            ]);
+                          }
+                        } else {
+                          const numericId = Number(s.id);
+                          const res = await apiDeleteChatSession(numericId);
+                          if (res && res.success) {
+                            // Remove the session id locally if present
+                            try {
+                              const stored = localStorage.getItem('chatSessionIds');
+                              if (stored) {
+                                let ids: number[] = JSON.parse(stored) || [];
+                                ids = ids.filter((x) => x !== numericId);
+                                localStorage.setItem('chatSessionIds', JSON.stringify(ids));
+                              }
+                            } catch (_) {}
+
+                            // Remove from local sessions state (handle mixed id types)
+                            setSessions((prev) => prev.filter((p) => Number(p.id) !== numericId));
+
+                            if (String(s.id) === String(currentSessionId)) {
+                              // pick the next available session (if any) after deletion
+                              const remaining = (sessions || []).filter((p) => String(p.id) !== String(s.id));
+                              if (remaining.length > 0) {
+                                const next = remaining[0];
+                                setCurrentSessionId(next.id);
+                                await loadHistoryForId(next.id);
+                              } else {
+                                const temp = {
+                                  id: `temp-${Date.now()}`,
+                                  title: 'New Chat',
+                                  message_count: 0,
+                                  created_at: new Date().toISOString(),
+                                  saved: false,
+                                } as LocalSession;
+                                setSessions([temp]);
+                                setCurrentSessionId(temp.id);
+                                setMessages([
+                                  {
+                                    id: Date.now().toString(),
+                                    type: "bot",
+                                    content:
+                                      "Hello! I'm your AI study assistant. I can help you create study plans, generate quizzes from your materials, set reminders, and answer questions about your subjects. What would you like to work on today?",
+                                    timestamp: new Date(),
+                                  },
+                                ]);
+                              }
+                            }
+                          }
+                        }
+                      } catch (err) {
+                        console.error("Delete session error:", err);
+                      }
+                    }}
+                    className="text-xs text-rose-400 ml-2 p-1 rounded hover:bg-slate-800"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          {/* Right: Chat area */}
+          <section className="flex-1 flex flex-col pr-8">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-900">
+              <div className="w-full">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -250,7 +525,10 @@ export default function ChatInterface() {
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} />
+              </div>
+            </div>
+          </section>
         </div>
         {/* Suggested Prompts */}
         {messages.length === 1 && (
@@ -295,10 +573,11 @@ export default function ChatInterface() {
                 placeholder="Ask me anything about your studies..."
                 className="w-full p-4 pr-12 bg-slate-800 border border-slate-700 hover:border-purple-500 focus:border-purple-500 focus:outline-none text-white placeholder-slate-400 rounded-xl resize-none min-h-[56px] max-h-32 transition-all duration-300 text-base"
                 rows={1}
+                disabled={isTyping}
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isTyping}
                 className="absolute right-3 bottom-3 p-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:hover:from-purple-600 disabled:hover:to-pink-600 text-white rounded-lg transition-all duration-300 shadow-md"
               >
                 <Send className="w-5 h-5" />
