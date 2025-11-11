@@ -134,8 +134,16 @@ export default function QuizGenerator() {
     }
   };
 
+  // Save quiz result with answers
   const saveQuizScore = async () => {
-    if (!user?.id || !user?.username || quizSaved) return;
+    if (!user || !user.id || !user.username) {
+      console.warn("User data missing, cannot save quiz result");
+      return;
+    }
+    if (quizSaved) {
+      // Already saved
+      return;
+    }
 
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
@@ -164,8 +172,12 @@ export default function QuizGenerator() {
     };
 
     try {
-      await saveQuizResultWithAnswers(payload);
-      setQuizSaved(true);
+      const saveResult = await saveQuizResultWithAnswers(payload);
+      if (saveResult.success) {
+        setQuizSaved(true);
+      } else {
+        console.error('Save quiz result failed:', saveResult.error);
+      }
     } catch (err) {
       console.error('Failed to save quiz result', err);
     }

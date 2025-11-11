@@ -20,7 +20,7 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 quiz_bp = Blueprint("quiz", __name__)
 
 def get_user_from_token():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
     if not token:
         return None
     user_data = decode_auth_token(token)
@@ -118,10 +118,15 @@ def check_answer():
 def save_quiz_result():
     try:
         user = get_user_from_token()
+        # Enforce authentication
+        if not user or "id" not in user or not user["id"]:
+            return jsonify({"success": False, "error": "Authentication required"}), 401
+
         data = request.get_json(force=True)
 
-        username = user["username"] if user else data.get("username")
-        user_id = user["id"] if user else None
+        username = user.get("username")
+        user_id = user.get("id")
+
         score = data.get("score")
         total_questions = data.get("total_questions")
         topic = data.get("topic", "General")
@@ -129,13 +134,14 @@ def save_quiz_result():
         time_taken = data.get("time_taken", 0)
         qnas = data.get("qnas", [])
 
-        if not username or score is None or total_questions is None:
-            return jsonify({"success": False, "error": "Missing required fields"}), 400
+        # Validate required fields
+        if score is None or total_questions is None:
+            return jsonify({"success": False, "error": "Missing required quiz result fields"}), 400
 
         percentage = round((score / total_questions) * 100, 2)
         conn = get_db_connection()
 
-        # Save attempt
+        # Save attempt with authenticated user_id
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO quiz_attempts
@@ -144,7 +150,7 @@ def save_quiz_result():
         """, (user_id, username, topic, difficulty, score, total_questions, percentage, time_taken))
         attempt_id = cur.lastrowid
 
-        # Save answers
+        # Save each quiz answer linked to this attempt
         for qa in qnas:
             question = qa.get('question', '')
             correct_answer = qa.get('correct_answer', '')
@@ -158,7 +164,7 @@ def save_quiz_result():
             """, (attempt_id, username, question, correct_answer, user_answer, is_correct, explanation))
         conn.commit()
 
-        # Get taken_at for scheduling retakes
+        # Retrieve taken_at for scheduling quiz retake
         time_cur = conn.cursor(dictionary=True)
         time_cur.execute("SELECT taken_at FROM quiz_attempts WHERE id = %s", (attempt_id,))
         row = time_cur.fetchone()
@@ -168,6 +174,7 @@ def save_quiz_result():
         cur.close()
 
         if taken_at is not None and user_id:
+            # You may replace this with your actual retake scheduling logic
             schedule_quiz_retake_if_needed(user_id, topic, taken_at, score, total_questions)
 
         return jsonify({"success": True, "message": "Quiz result and answers saved successfully", "percentage": percentage})
@@ -175,7 +182,6 @@ def save_quiz_result():
     except Exception as e:
         print(f"Error in save_quiz_result: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 
 @quiz_bp.route("/performance", methods=["GET"])
