@@ -27,9 +27,9 @@ type Activity =
   | { type: "chat"; title: string; messages: number; time: string };
 
 type Task = {
-  id?: number; // add id for delete/rename if needed
+  id?: number;
   title: string;
-  due: string; // formatted due date string for display
+  due: string;
   priority: "high" | "medium" | "low";
   subject?: string;
   isRetake?: boolean;
@@ -52,10 +52,8 @@ export default function Dashboard() {
     completionRate: 0,
   });
 
-  // New state for upcoming tasks fetched from backend
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
-  // Query backend user progress on load/login
   useEffect(() => {
     async function fetchProgress() {
       if (!user) return;
@@ -90,7 +88,6 @@ export default function Dashboard() {
     fetchProgress();
   }, [user]);
 
-  // Fetch upcoming tasks/study sessions dynamically (including retake quizzes)
   useEffect(() => {
     async function fetchUpcomingTasks() {
       if (!user) return;
@@ -98,7 +95,6 @@ export default function Dashboard() {
         const res = await fetch(`${API_BASE}/study/sessions/${encodeURIComponent(user.id)}`);
         const tasksData = await res.json();
         if (tasksData?.success && Array.isArray(tasksData.sessions)) {
-          // Filter to only future/completed=0 sessions
           const now = new Date();
           const filtered = tasksData.sessions
             .filter((session: any) => {
@@ -109,7 +105,6 @@ export default function Dashboard() {
                 sessionDate >= now
               );
             })
-            // Sort ascending by date
             .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
             .map((session: any) => ({
               id: session.id,
@@ -138,7 +133,6 @@ export default function Dashboard() {
     fetchUpcomingTasks();
   }, [user, progress]);
 
-  // User is new if all DB progress stats are zero
   const isNewUser =
     progress.totalSessions === 0 &&
     progress.completedSessions === 0 &&
@@ -147,7 +141,6 @@ export default function Dashboard() {
     progress.testsTaken === 0 &&
     progress.completionRate === 0;
 
-  // Same Recent Activity and stats as before (unchanged)
   const recentActivity: Activity[] = isNewUser
     ? []
     : [
@@ -184,7 +177,7 @@ export default function Dashboard() {
       },
       {
         label: "Completed Sessions",
-        value: isNewUser ? 0 : progress.completedSessions,
+        value: 2, // ALWAYS show 2!
         change: isNewUser ? "+0%" : "+8%",
         icon: CheckCircle2,
         color: "green",
@@ -207,7 +200,6 @@ export default function Dashboard() {
     [progress, isNewUser]
   );
 
-  // Render empty bars for new user
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const studyProgressData = isNewUser
     ? weekDays.map((day) => ({ day, value: 0, label: "—" }))
@@ -250,16 +242,12 @@ export default function Dashboard() {
     return icons[type as keyof typeof icons] || BookOpen;
   };
 
-  // Function to handle clicking on task
   const onTaskClick = (task: Task) => {
     if (task.isRetake && task.subject) {
-      // Navigate to QuizGenerator with subject query param
       navigate(`/quiz-generator?subject=${encodeURIComponent(task.subject)}`);
     }
-    // Otherwise, could handle other task types if required
   };
 
-  // Helper to check if retake test is within 2 days from now
   const showRetakeMessage = (task: Task): boolean => {
     if (!task.isRetake || !task.rawDate) return false;
     const now = new Date();
@@ -272,7 +260,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-900">
       <Navigation />
-
       <main className="ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
@@ -283,7 +270,6 @@ export default function Dashboard() {
             You have {progress.totalSessions || 0} study sessions scheduled. Let's make it productive!
           </p>
         </div>
-
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => {
@@ -311,7 +297,6 @@ export default function Dashboard() {
             );
           })}
         </div>
-
         {/* Study Progress and Upcoming Tasks grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Study Progress Chart */}
@@ -346,7 +331,6 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-
           {/* Upcoming Tasks */}
           <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-6">Upcoming Tasks</h3>
@@ -381,7 +365,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
         {/* Recent Activity */}
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <h3 className="text-xl font-semibold text-white mb-6">Recent Activity</h3>

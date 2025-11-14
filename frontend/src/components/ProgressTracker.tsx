@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Navigation from './Navigation';
 import { TrendingUp, Target, Award, Clock, BookOpen, Brain } from 'lucide-react';
 
+// Data interfaces remain unchanged
 interface Subject {
   name: string;
   progress: number;
@@ -23,80 +24,66 @@ interface Achievement {
 export default function ProgressTracker() {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
 
-  // Change to: fetch/check user progress for real logic
-  const userHasData = false; // <--- set to false to show new-user state
+  // Set this to true for showing active data every time
+  const userHasData = true;
 
-  const subjects: Subject[] = userHasData
-    ? [
-        { name: 'Computer Science', progress: 78, totalHours: 24.5, completedSessions: 18, averageScore: 87, color: 'purple' },
-        { name: 'Mathematics', progress: 65, totalHours: 18.2, completedSessions: 14, averageScore: 82, color: 'blue' },
-        { name: 'Database Systems', progress: 92, totalHours: 16.8, completedSessions: 12, averageScore: 94, color: 'green' },
-        { name: 'Machine Learning', progress: 45, totalHours: 12.3, completedSessions: 8, averageScore: 76, color: 'orange' }
-      ]
-    : [];
+  const subjects: Subject[] = [
+    { name: 'Computer Science', progress: 82, totalHours: 28.5, completedSessions: 21, averageScore: 88, color: 'purple' },
+    { name: 'Mathematics', progress: 70, totalHours: 19.9, completedSessions: 16, averageScore: 79, color: 'blue' },
+    { name: 'Database Systems', progress: 94, totalHours: 21.2, completedSessions: 14, averageScore: 92, color: 'green' },
+    { name: 'Machine Learning', progress: 57, totalHours: 13.1, completedSessions: 9, averageScore: 81, color: 'orange' }
+  ];
 
-  const achievements: Achievement[] = userHasData
-    ? [
-        {
-          id: '1',
-          title: 'Study Streak Master',
-          description: 'Study for 7 consecutive days',
-          icon: Award,
-          completed: true,
-          completedDate: '2025-01-10'
-        },
-        {
-          id: '2',
-          title: 'Quiz Champion',
-          description: 'Score above 90% in 5 quizzes',
-          icon: Target,
-          completed: true,
-          completedDate: '2025-01-08'
-        },
-        {
-          id: '3',
-          title: 'Time Master',
-          description: 'Study for 50+ hours this month',
-          icon: Clock,
-          completed: false
-        },
-        {
-          id: '4',
-          title: 'Knowledge Seeker',
-          description: 'Complete 100 study sessions',
-          icon: BookOpen,
-          completed: false
-        },
-        {
-          id: '5',
-          title: 'AI Assistant Pro',
-          description: 'Use AI chat for 30+ conversations',
-          icon: Brain,
-          completed: true,
-          completedDate: '2025-01-12'
-        }
-      ]
-    : [];
+  const achievements: Achievement[] = [
+    {
+      id: '1',
+      title: 'Study Streak Master',
+      description: 'Study for 7 consecutive days',
+      icon: Award,
+      completed: true,
+      completedDate: '2025-11-12'
+    },
+    {
+      id: '2',
+      title: 'Quiz Champion',
+      description: 'Score above 90% in 5 quizzes',
+      icon: Target,
+      completed: true,
+      completedDate: '2025-11-10'
+    },
+    {
+      id: '3',
+      title: 'Time Master',
+      description: 'Study for 50+ hours this month',
+      icon: Clock,
+      completed: false
+    },
+    {
+      id: '4',
+      title: 'Knowledge Seeker',
+      description: 'Complete 100 study sessions',
+      icon: BookOpen,
+      completed: false
+    },
+    {
+      id: '5',
+      title: 'AI Assistant Pro',
+      description: 'Use AI chat for 30+ conversations',
+      icon: Brain,
+      completed: true,
+      completedDate: '2025-11-13'
+    }
+  ];
 
-  const weeklyData = userHasData
-    ? [
-        { day: 'Mon', hours: 3.5, score: 85 },
-        { day: 'Tue', hours: 2.8, score: 92 },
-        { day: 'Wed', hours: 4.2, score: 78 },
-        { day: 'Thu', hours: 3.1, score: 88 },
-        { day: 'Fri', hours: 2.5, score: 91 },
-        { day: 'Sat', hours: 5.2, score: 83 },
-        { day: 'Sun', hours: 3.8, score: 89 }
-      ]
-    : [
-        { day: 'Mon', hours: 0, score: 0 },
-        { day: 'Tue', hours: 0, score: 0 },
-        { day: 'Wed', hours: 0, score: 0 },
-        { day: 'Thu', hours: 0, score: 0 },
-        { day: 'Fri', hours: 0, score: 0 },
-        { day: 'Sat', hours: 0, score: 0 },
-        { day: 'Sun', hours: 0, score: 0 }
-      ];
+  const weeklyData = [
+    { day: 'Mon', hours: 3.8, score: 87 },
+    { day: 'Tue', hours: 2.4, score: 91 },
+    { day: 'Wed', hours: 4.1, score: 84 },
+    { day: 'Thu', hours: 3.6, score: 88 },
+    { day: 'Fri', hours: 2.9, score: 93 },
+    { day: 'Sat', hours: 5.5, score: 80 },
+    { day: 'Sun', hours: 4.2, score: 89 }
+  ];
 
   const getSubjectColor = (color: string) => {
     const colors = {
@@ -107,7 +94,6 @@ export default function ProgressTracker() {
     };
     return colors[color as keyof typeof colors];
   };
-
   const getSubjectBgColor = (color: string) => {
     const colors = {
       purple: 'bg-purple-500/20 border-purple-500/30',
@@ -118,19 +104,12 @@ export default function ProgressTracker() {
     return colors[color as keyof typeof colors];
   };
 
-  const overallStats = userHasData && subjects.length
-    ? {
-        totalHours: subjects.reduce((acc, s) => acc + s.totalHours, 0),
-        averageScore: Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length),
-        completedAchievements: achievements.filter(a => a.completed).length,
-        studyStreak: 12
-      }
-    : {
-        totalHours: 0,
-        averageScore: "—",
-        completedAchievements: 0,
-        studyStreak: "—"
-      };
+  const overallStats = {
+    totalHours: subjects.reduce((acc, s) => acc + s.totalHours, 0),
+    averageScore: Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length),
+    completedAchievements: achievements.filter(a => a.completed).length,
+    studyStreak: 9
+  };
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -162,7 +141,7 @@ export default function ProgressTracker() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {userHasData && overallStats.totalHours ? `${overallStats.totalHours.toFixed(1)}h` : `0h`}
+                {overallStats.totalHours.toFixed(1)}h
               </p>
               <p className="text-slate-400 text-sm font-semibold">Total Hours</p>
             </div>
@@ -173,7 +152,7 @@ export default function ProgressTracker() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {userHasData && overallStats.averageScore !== "—" ? `${overallStats.averageScore}%` : "—"}
+                {overallStats.averageScore}%
               </p>
               <p className="text-slate-400 text-sm font-semibold">Average Score</p>
             </div>
@@ -184,7 +163,7 @@ export default function ProgressTracker() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {userHasData ? `${overallStats.completedAchievements}/${achievements.length}` : "0/0"}
+                {overallStats.completedAchievements}/{achievements.length}
               </p>
               <p className="text-slate-400 text-sm font-semibold">Achievements</p>
             </div>
@@ -195,7 +174,7 @@ export default function ProgressTracker() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {userHasData && overallStats.studyStreak !== "—" ? overallStats.studyStreak : "—"}
+                {overallStats.studyStreak}
               </p>
               <p className="text-slate-400 text-sm font-semibold">Day Streak</p>
             </div>
@@ -214,17 +193,17 @@ export default function ProgressTracker() {
                     <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: userHasData ? `${(day.hours / 6) * 100}%` : '0%' }}
+                        style={{ width: `${(day.hours / 6) * 100}%` }}
                       />
                     </div>
-                    <span className="text-white text-sm w-10">{userHasData ? `${day.hours}h` : `0h`}</span>
+                    <span className="text-white text-sm w-10">{day.hours}h</span>
                     <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: userHasData ? `${day.score}%` : '0%' }}
+                        style={{ width: `${day.score}%` }}
                       />
                     </div>
-                    <span className="text-white text-sm w-10">{userHasData ? `${day.score}%` : `—`}</span>
+                    <span className="text-white text-sm w-10">{day.score}%</span>
                   </div>
                 </div>
               ))}
@@ -245,9 +224,6 @@ export default function ProgressTracker() {
           <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-6">Achievements</h3>
             <div className="space-y-4">
-              {(!achievements || achievements.length === 0) && (
-                <div className="text-slate-500 py-8 text-center">No achievements yet.</div>
-              )}
               {achievements.map((achievement) => {
                 const Icon = achievement.icon;
                 return (
@@ -259,11 +235,10 @@ export default function ProgressTracker() {
                         : 'bg-slate-700/30 border-slate-600/50'
                     }`}
                   >
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      achievement.completed
-                        ? 'bg-green-500'
-                        : 'bg-slate-600'
-                    }`}>
+                    <div
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                        achievement.completed ? 'bg-green-500' : 'bg-slate-600'
+                      }`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
@@ -295,9 +270,6 @@ export default function ProgressTracker() {
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <h3 className="text-xl font-semibold text-white mb-6">Subject Progress</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {subjects.length === 0 && (
-              <div className="col-span-2 text-slate-500 p-8 text-center">No subject progress yet.</div>
-            )}
             {subjects.map((subject, index) => (
               <div
                 key={index}

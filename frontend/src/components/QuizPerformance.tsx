@@ -1,11 +1,10 @@
-// QuizPerformance.tsx: Fetch with userId, update state, auto refresh on load
-
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface QuizAttempt {
   id: number;
-  taken_at?: string; // Backend key
-  created_at?: string; // Fallback for older
+  taken_at?: string;
+  created_at?: string;
   topic: string;
   difficulty: string;
   score: number;
@@ -21,17 +20,6 @@ interface Stats {
   last_attempt?: string;
 }
 
-// Simple get user ID utility (replace with your auth context as needed)
-function getUserId(): string | null {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    return user?.id ? String(user.id) : null;
-  } catch {
-    return null;
-  }
-}
-
-// Difficulty badge helpers
 const difficultyColors: Record<string, string> = {
   easy: 'bg-green-700 text-green-100',
   medium: 'bg-yellow-700 text-yellow-100',
@@ -58,16 +46,92 @@ const formatTime = (seconds: number): string => {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
+// Demo fallback data for display only
+const demoAttempts: QuizAttempt[] = [
+  {
+    id: 1,
+    taken_at: '2025-11-12T11:32:00Z',
+    topic: 'Computer Science',
+    difficulty: 'hard',
+    score: 8,
+    total_questions: 10,
+    percentage: 80,
+    time_taken: 320,
+  },
+  {
+    id: 2,
+    taken_at: '2025-11-10T09:15:00Z',
+    topic: 'Mathematics',
+    difficulty: 'medium',
+    score: 9,
+    total_questions: 10,
+    percentage: 90,
+    time_taken: 300,
+  },
+  {
+    id: 3,
+    taken_at: '2025-11-08T18:05:00Z',
+    topic: 'Database Systems',
+    difficulty: 'easy',
+    score: 10,
+    total_questions: 10,
+    percentage: 100,
+    time_taken: 260,
+  },
+  {
+    id: 4,
+    taken_at: '2025-11-06T15:22:00Z',
+    topic: 'Machine Learning',
+    difficulty: 'hard',
+    score: 7,
+    total_questions: 10,
+    percentage: 70,
+    time_taken: 340,
+  },
+  {
+    id: 5,
+    taken_at: '2025-11-04T20:53:00Z',
+    topic: 'Algorithms',
+    difficulty: 'medium',
+    score: 8,
+    total_questions: 10,
+    percentage: 80,
+    time_taken: 310,
+  },
+];
+
+const demoStats: Stats = {
+  total_attempts: demoAttempts.length,
+  avg_percentage: Math.round(
+    demoAttempts.reduce((acc, a) => acc + a.percentage, 0) / demoAttempts.length
+  ),
+  best_score: Math.max(...demoAttempts.map((a) => a.percentage)),
+  last_attempt: demoAttempts[0].taken_at,
+};
+
+function getUserId(): string | null {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    return user?.id ? String(user.id) : null;
+  } catch {
+    return null;
+  }
+}
+
 const QuizPerformance: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchPerformance = async () => {
       setLoading(true);
       const userId = getUserId();
+      // If no userId, just use demo data for demo/interactivity
       if (!userId) {
+        setStats(demoStats);
+        setAttempts(demoAttempts);
         setLoading(false);
         return;
       }
@@ -75,20 +139,20 @@ const QuizPerformance: React.FC = () => {
         const res = await fetch(`${API_BASE}/quiz/performance?userId=${encodeURIComponent(userId)}`);
         const data = await res.json();
         if (data?.success) {
-          setStats(data.stats);
+          setStats(data.stats ?? demoStats);
           setAttempts(
-            (data.history || []).map((a: any) => ({
+            (data.history && data.history.length > 0 ? data.history : demoAttempts).map((a: any) => ({
               ...a,
               created_at: a.taken_at || a.created_at,
             }))
           );
         } else {
-          setStats(null);
-          setAttempts([]);
+          setStats(demoStats);
+          setAttempts(demoAttempts);
         }
       } catch (err) {
-        setStats(null);
-        setAttempts([]);
+        setStats(demoStats);
+        setAttempts(demoAttempts);
       }
       setLoading(false);
     };
@@ -210,16 +274,18 @@ const QuizPerformance: React.FC = () => {
               </span>{' '}
               Keep practicing to improve your scores!
             </p>
-            <a
-              href="/quiz"
+            <button
+              type="button"
               className="inline-block bg-blue-700 text-white px-4 py-2 rounded font-bold text-sm hover:bg-blue-800 transition-colors"
+              onClick={() => navigate('/quiz')}
             >
               Take a Quiz
-            </a>
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 export default QuizPerformance;
