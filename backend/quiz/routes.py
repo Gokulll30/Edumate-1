@@ -75,7 +75,7 @@ def upload_and_generate():
 
         prompt = build_mcq_prompt(text, num_q=num_q, difficulty=difficulty)
         response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash",
             contents=prompt,
             config={
                 "response_mime_type": "application/json",
