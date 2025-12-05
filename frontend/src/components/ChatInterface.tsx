@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import Navigation from "./Navigation";
 import { Send, Paperclip, Mic, Bot, User, Sparkles, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useChatContext } from "../context/ChatContext";
 import {
   sendChatMessage,
   getChatHistory as apiGetChatHistory,
@@ -20,28 +21,16 @@ interface Message {
 }
 
 interface LocalSession {
-  id: number | string; // number for saved DB sessions, string like 'temp-...' for unsaved
+  id: number | string;
   title: string;
   message_count: number;
   created_at: string;
-  saved?: boolean; // whether persisted in DB
+  saved?: boolean;
 }
+
 export default function ChatInterface() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      type: "bot",
-      content:
-        "Hello! I'm your AI study assistant. I can help you create study plans, generate quizzes from your materials, set reminders, and answer questions about your subjects. What would you like to work on today?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingContent, setTypingContent] = useState("");
-  const [sessions, setSessions] = useState<LocalSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<number | string | null>(null);
+  const chatContext = useChatContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,18 +40,22 @@ export default function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, typingContent]);
+  }, [chatContext.messages, chatContext.typingContent]);
 
   // Load chat sessions for the authenticated user (or anonymous fallback)
   useEffect(() => {
     const loadSessions = async () => {
+      // Only load if we haven't loaded yet
+      if (chatContext.chatLoaded) return;
+
       try {
         const res = await apiGetChatSessions();
         if (res && res.success) {
           const list = (res.sessions || []).map((s: any) => ({ ...s, id: Number(s.id), saved: true }));
-          setSessions(list);
+          chatContext.setSessions(list);
           if (list.length > 0) {
-            setCurrentSessionId(Number(list[0].id));
+            chatContext.setCurrentSessionId(Number(list[0].id));
+            chatContext.setChatLoaded(true);
             return;
           }
         }
@@ -75,28 +68,30 @@ export default function ChatInterface() {
           created_at: new Date().toISOString(),
           saved: false,
         } as LocalSession;
-        setSessions([temp]);
-        setCurrentSessionId(temp.id);
+        chatContext.setSessions([temp]);
+        chatContext.setCurrentSessionId(temp.id);
+        chatContext.setChatLoaded(true);
       } catch (err) {
         console.error("Error loading sessions:", err);
+        chatContext.setChatLoaded(true);
       }
     };
 
     loadSessions();
-  }, [user]);
+  }, [user, chatContext]);
 
   // Load history whenever the current session changes using the centralized helper
   useEffect(() => {
-    if (!currentSessionId) return;
-    loadHistoryForId(currentSessionId);
-  }, [currentSessionId]);
+    if (!chatContext.currentSessionId) return;
+    loadHistoryForId(chatContext.currentSessionId);
+  }, [chatContext.currentSessionId]);
 
   // Helper to load history for a session id (number or temp string)
   const loadHistoryForId = async (id: number | string | null) => {
     if (!id) return;
     try {
       if (typeof id === 'string' && id.startsWith('temp-')) {
-        setMessages([
+        chatContext.setMessages([
           {
             id: Date.now().toString(),
             type: "bot",
@@ -120,7 +115,7 @@ export default function ChatInterface() {
         timestamp: new Date(msg.created_at || msg.timestamp),
       }));
 
-      setMessages(history.length ? history : [
+      chatContext.setMessages(history.length ? history : [
         {
           id: Date.now().toString(),
           type: "bot",
@@ -134,25 +129,26 @@ export default function ChatInterface() {
     }
   };
 
-    // Load persisted session id for anonymous users
-    useEffect(() => {
-      try {
-        // prefer stored array of ids (most recent first)
-        const storedList = localStorage.getItem('chatSessionIds');
-        if (storedList) {
-          const ids: number[] = JSON.parse(storedList) || [];
-          if (ids.length > 0 && !currentSessionId) {
-            setCurrentSessionId(Number(ids[0]));
-          }
-        } else {
-          const sid = localStorage.getItem('chatSessionId');
-          if (sid && !currentSessionId) setCurrentSessionId(Number(sid));
+  // Load persisted session id for anonymous users
+  useEffect(() => {
+    try {
+      // prefer stored array of ids (most recent first)
+      const storedList = localStorage.getItem('chatSessionIds');
+      if (storedList) {
+        const ids: number[] = JSON.parse(storedList) || [];
+        if (ids.length > 0 && !chatContext.currentSessionId) {
+          chatContext.setCurrentSessionId(Number(ids[0]));
         }
-      } catch (_) {}
-    }, []);
+      } else {
+        const sid = localStorage.getItem('chatSessionId');
+        if (sid && !chatContext.currentSessionId) chatContext.setCurrentSessionId(Number(sid));
+      }
+    } catch (_) { }
+  }, []);
+
   const animateBotReply = (fullText: string) => {
-    setTypingContent("");
-    setIsTyping(true);
+    chatContext.setTypingContent("");
+    chatContext.setIsTyping(true);
     setTimeout(() => {
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -160,41 +156,41 @@ export default function ChatInterface() {
         content: fullText,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, botMessage]);
-      setTypingContent("");
-      setIsTyping(false);
+      chatContext.setMessages((prev) => [...prev, botMessage]);
+      chatContext.setTypingContent("");
+      chatContext.setIsTyping(false);
     }, 700);
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+    if (!chatContext.inputValue.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: "user",
-      content: inputValue.trim(),
+      content: chatContext.inputValue.trim(),
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setIsTyping(true);
+    chatContext.setMessages((prev) => [...prev, userMessage]);
+    chatContext.setInputValue("");
+    chatContext.setIsTyping(true);
 
     try {
       let sessionIdToUse: number | undefined = undefined;
 
       // If current session is a temp local session, create it in DB now
-      if (typeof currentSessionId === 'string' && currentSessionId.startsWith('temp-')) {
+      if (typeof chatContext.currentSessionId === 'string' && chatContext.currentSessionId.startsWith('temp-')) {
         const created = await apiCreateChatSession();
         if (!created || !created.success || !created.session_id) {
           throw new Error('Failed to create session');
         }
-  const sid = created.session_id as number;
-  sessionIdToUse = sid;
+        const sid = created.session_id as number;
+        sessionIdToUse = sid;
 
         // Replace the temp session in our local list with the persisted one
-        setSessions((prev) => {
-          const rest = prev.filter((p) => p.id !== currentSessionId);
+        chatContext.setSessions((prev) => {
+          const rest = prev.filter((p) => p.id !== chatContext.currentSessionId);
           const newSession: LocalSession = {
             id: sid,
             title: 'New Chat',
@@ -214,14 +210,14 @@ export default function ChatInterface() {
             ids = ids.slice(0, 50);
             localStorage.setItem('chatSessionIds', JSON.stringify(ids));
           }
-        } catch (_) {}
+        } catch (_) { }
 
-        setCurrentSessionId(sessionIdToUse);
-      } else if (typeof currentSessionId === 'number') {
-        sessionIdToUse = currentSessionId;
-      } else if (typeof currentSessionId === 'string') {
+        chatContext.setCurrentSessionId(sessionIdToUse);
+      } else if (typeof chatContext.currentSessionId === 'number') {
+        sessionIdToUse = chatContext.currentSessionId;
+      } else if (typeof chatContext.currentSessionId === 'string') {
         // maybe a numeric string; try to coerce
-        const n = Number(currentSessionId);
+        const n = Number(chatContext.currentSessionId);
         if (!isNaN(n)) sessionIdToUse = n;
       }
 
@@ -234,7 +230,7 @@ export default function ChatInterface() {
       // After send, refresh sessions to pick up any server-side title updates
       try {
         const list = await apiGetChatSessions();
-        if (list && list.success) setSessions((prev) => {
+        if (list && list.success) chatContext.setSessions((prev) => {
           const server = (list.sessions || []).map((s: any) => ({ ...s, id: Number(s.id), saved: true }));
           const temps = prev.filter((p) => typeof p.id === 'string' && String(p.id).startsWith('temp-'));
           return [...server, ...temps];
@@ -246,7 +242,7 @@ export default function ChatInterface() {
       animateBotReply(botReply);
     } catch (error) {
       console.error('Error sending message:', error);
-      setIsTyping(false);
+      chatContext.setIsTyping(false);
     }
   };
 
@@ -275,9 +271,9 @@ export default function ChatInterface() {
         content: fileContent,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, fileMessage]);
+      chatContext.setMessages((prev) => [...prev, fileMessage]);
 
-      setInputValue(fileContent);
+      chatContext.setInputValue(fileContent);
       await handleSendMessage();
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -302,7 +298,7 @@ export default function ChatInterface() {
   return (
     <div className="min-h-screen bg-gray-900">
       <Navigation />
-  <main className="ml-64 flex flex-col h-screen">
+      <main className="ml-64 flex flex-col h-screen">
         {/* Header */}
         <div className="bg-slate-900 border-b border-slate-700 p-6">
           <div className="flex items-center space-x-3">
@@ -332,9 +328,9 @@ export default function ChatInterface() {
                       created_at: new Date().toISOString(),
                       saved: false,
                     } as LocalSession;
-                    setSessions((prev) => [temp, ...(prev || [])]);
-                    setCurrentSessionId(temp.id);
-                    setMessages([
+                    chatContext.setSessions((prev) => [temp, ...(prev || [])]);
+                    chatContext.setCurrentSessionId(temp.id);
+                    chatContext.setMessages([
                       {
                         id: Date.now().toString(),
                         type: "bot",
@@ -353,7 +349,7 @@ export default function ChatInterface() {
               </button>
             </div>
             <div className="space-y-2 overflow-y-auto">
-              {sessions.map((s) => (
+              {chatContext.sessions.map((s) => (
                 <div
                   key={String(s.id)}
                   onClick={async () => {
@@ -363,13 +359,12 @@ export default function ChatInterface() {
                       const n = Number(s.id);
                       selected = isNaN(n) ? s.id : n;
                     }
-                    setCurrentSessionId(selected);
+                    chatContext.setCurrentSessionId(selected);
                     // load history immediately for better UX
                     await loadHistoryForId(selected);
                   }}
-                  className={`p-2 rounded cursor-pointer hover:bg-slate-800 flex items-center justify-between ${
-                    String(s.id) === String(currentSessionId) ? "bg-slate-800" : ""
-                  }`}
+                  className={`p-2 rounded cursor-pointer hover:bg-slate-800 flex items-center justify-between ${String(s.id) === String(chatContext.currentSessionId) ? "bg-slate-800" : ""
+                    }`}
                 >
                   <div>
                     <div className="text-sm text-slate-200">{s.title || "New Chat"}</div>
@@ -381,8 +376,8 @@ export default function ChatInterface() {
                       try {
                         // If this is an unsaved local session, just remove locally
                         if (typeof s.id === 'string' && String(s.id).startsWith('temp-')) {
-                          setSessions((prev) => prev.filter((p) => String(p.id) !== String(s.id)));
-                          if (String(s.id) === String(currentSessionId)) {
+                          chatContext.setSessions((prev) => prev.filter((p) => String(p.id) !== String(s.id)));
+                          if (String(s.id) === String(chatContext.currentSessionId)) {
                             // open a fresh new temp session
                             const temp = {
                               id: `temp-${Date.now()}`,
@@ -391,9 +386,9 @@ export default function ChatInterface() {
                               created_at: new Date().toISOString(),
                               saved: false,
                             } as LocalSession;
-                            setSessions((prev) => [temp, ...(prev || [])]);
-                            setCurrentSessionId(temp.id);
-                            setMessages([
+                            chatContext.setSessions((prev) => [temp, ...(prev || [])]);
+                            chatContext.setCurrentSessionId(temp.id);
+                            chatContext.setMessages([
                               {
                                 id: Date.now().toString(),
                                 type: "bot",
@@ -415,17 +410,17 @@ export default function ChatInterface() {
                                 ids = ids.filter((x) => x !== numericId);
                                 localStorage.setItem('chatSessionIds', JSON.stringify(ids));
                               }
-                            } catch (_) {}
+                            } catch (_) { }
 
                             // Remove from local sessions state (handle mixed id types)
-                            setSessions((prev) => prev.filter((p) => Number(p.id) !== numericId));
+                            chatContext.setSessions((prev) => prev.filter((p) => Number(p.id) !== numericId));
 
-                            if (String(s.id) === String(currentSessionId)) {
+                            if (String(s.id) === String(chatContext.currentSessionId)) {
                               // pick the next available session (if any) after deletion
-                              const remaining = (sessions || []).filter((p) => String(p.id) !== String(s.id));
+                              const remaining = (chatContext.sessions || []).filter((p) => String(p.id) !== String(s.id));
                               if (remaining.length > 0) {
                                 const next = remaining[0];
-                                setCurrentSessionId(next.id);
+                                chatContext.setCurrentSessionId(next.id);
                                 await loadHistoryForId(next.id);
                               } else {
                                 const temp = {
@@ -435,9 +430,9 @@ export default function ChatInterface() {
                                   created_at: new Date().toISOString(),
                                   saved: false,
                                 } as LocalSession;
-                                setSessions([temp]);
-                                setCurrentSessionId(temp.id);
-                                setMessages([
+                                chatContext.setSessions([temp]);
+                                chatContext.setCurrentSessionId(temp.id);
+                                chatContext.setMessages([
                                   {
                                     id: Date.now().toString(),
                                     type: "bot",
@@ -469,76 +464,72 @@ export default function ChatInterface() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-900">
               <div className="w-full">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex items-start space-x-4 ${
-                message.type === "user"
-                  ? "flex-row-reverse space-x-reverse"
-                  : ""
-              }`}
-            >
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  message.type === "user"
-                    ? "bg-gradient-to-r from-blue-500 to-cyan-500"
-                    : "bg-gradient-to-r from-purple-500 to-pink-500"
-                }`}
-              >
-                {message.type === "user" ? (
-                  <User className="w-5 h-5 text-white" />
-                ) : (
-                  <Bot className="w-5 h-5 text-white" />
-                )}
-              </div>
-              <div
-                className={`max-w-xl ${
-                  message.type === "user" ? "text-right" : ""
-                }`}
-              >
-                <div
-                  className={`inline-block p-4 rounded-2xl shadow-md ${
-                    message.type === "user"
-                      ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
-                      : "bg-slate-800 border border-slate-700 text-white"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap leading-relaxed">
-                    {message.content}
-                  </p>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  {formatTime(message.timestamp)}
-                </p>
-              </div>
-            </div>
-          ))}
+                {chatContext.messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex items-start space-x-4 ${message.type === "user"
+                        ? "flex-row-reverse space-x-reverse"
+                        : ""
+                      }`}
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${message.type === "user"
+                          ? "bg-gradient-to-r from-blue-500 to-cyan-500"
+                          : "bg-gradient-to-r from-purple-500 to-pink-500"
+                        }`}
+                    >
+                      {message.type === "user" ? (
+                        <User className="w-5 h-5 text-white" />
+                      ) : (
+                        <Bot className="w-5 h-5 text-white" />
+                      )}
+                    </div>
+                    <div
+                      className={`max-w-xl ${message.type === "user" ? "text-right" : ""
+                        }`}
+                    >
+                      <div
+                        className={`inline-block p-4 rounded-2xl shadow-md ${message.type === "user"
+                            ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
+                            : "bg-slate-800 border border-slate-700 text-white"
+                          }`}
+                      >
+                        <p className="whitespace-pre-wrap leading-relaxed">
+                          {message.content}
+                        </p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">
+                        {formatTime(message.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
 
-          {/* Animated typing reply */}
-          {typingContent && (
-            <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white shadow-md">
-                <p className="whitespace-pre-wrap">{typingContent}</p>
-              </div>
-            </div>
-          )}
-              <div ref={messagesEndRef} />
+                {/* Animated typing reply */}
+                {chatContext.typingContent && (
+                  <div className="flex items-start space-x-4">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                      <Bot className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-white shadow-md">
+                      <p className="whitespace-pre-wrap">{chatContext.typingContent}</p>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
             </div>
           </section>
         </div>
         {/* Suggested Prompts */}
-        {messages.length === 1 && (
+        {chatContext.messages.length === 1 && (
           <div className="px-8 pb-4 bg-gray-900">
             <p className="text-slate-400 text-sm mb-3">Try asking me about:</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {suggestedPrompts.map((prompt, index) => (
                 <button
                   key={index}
-                  onClick={() => setInputValue(prompt)}
+                  onClick={() => chatContext.setInputValue(prompt)}
                   className="text-left p-4 bg-slate-800 border border-slate-700 hover:border-purple-500 rounded-xl text-slate-200 hover:text-white transition-all duration-300 text-base shadow-sm"
                 >
                   <Sparkles className="w-5 h-5 inline mr-2 text-purple-400" />
@@ -567,17 +558,17 @@ export default function ChatInterface() {
             </button>
             <div className="flex-1 relative">
               <textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                value={chatContext.inputValue}
+                onChange={(e) => chatContext.setInputValue(e.target.value)}
                 onKeyDown={handleKeyPress}
                 placeholder="Ask me anything about your studies..."
                 className="w-full p-4 pr-12 bg-slate-800 border border-slate-700 hover:border-purple-500 focus:border-purple-500 focus:outline-none text-white placeholder-slate-400 rounded-xl resize-none min-h-[56px] max-h-32 transition-all duration-300 text-base"
                 rows={1}
-                disabled={isTyping}
+                disabled={chatContext.isTyping}
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isTyping}
+                disabled={!chatContext.inputValue.trim() || chatContext.isTyping}
                 className="absolute right-3 bottom-3 p-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:hover:from-purple-600 disabled:hover:to-pink-600 text-white rounded-lg transition-all duration-300 shadow-md"
               >
                 <Send className="w-5 h-5" />

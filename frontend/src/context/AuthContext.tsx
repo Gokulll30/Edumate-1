@@ -125,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('edumate_user');
     localStorage.removeItem('authToken');
     sessionStorage.removeItem('edumate_quiz_state');
+    sessionStorage.removeItem('edumate_chat_state');
   };
 
   return (
