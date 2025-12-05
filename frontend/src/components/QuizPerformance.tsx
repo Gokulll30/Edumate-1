@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 interface QuizAttempt {
   id: number;
@@ -109,16 +110,9 @@ const demoStats: Stats = {
   last_attempt: demoAttempts[0].taken_at,
 };
 
-function getUserId(): string | null {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    return user?.id ? String(user.id) : null;
-  } catch {
-    return null;
-  }
-}
 
 const QuizPerformance: React.FC = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,37 +121,42 @@ const QuizPerformance: React.FC = () => {
   useEffect(() => {
     const fetchPerformance = async () => {
       setLoading(true);
-      const userId = getUserId();
-      // If no userId, just use demo data for demo/interactivity
-      if (!userId) {
+
+      if (!user || !user.id) {
+        // Only show demo data if truly not logged in
         setStats(demoStats);
         setAttempts(demoAttempts);
         setLoading(false);
         return;
       }
+
       try {
-        const res = await fetch(`${API_BASE}/quiz/performance?userId=${encodeURIComponent(userId)}`);
+        const res = await fetch(`${API_BASE}/quiz/performance?userId=${encodeURIComponent(user.id)}`);
         const data = await res.json();
         if (data?.success) {
-          setStats(data.stats ?? demoStats);
+          setStats(data.stats);
           setAttempts(
-            (data.history && data.history.length > 0 ? data.history : demoAttempts).map((a: any) => ({
+            (data.history || []).map((a: any) => ({
               ...a,
               created_at: a.taken_at || a.created_at,
             }))
           );
         } else {
-          setStats(demoStats);
-          setAttempts(demoAttempts);
+          // If fetch fails but we are logged in, it might be better to show empty state or error
+          // rather than demo data, to avoid confusion. But for now let's show empty.
+          setStats(null);
+          setAttempts([]);
         }
       } catch (err) {
-        setStats(demoStats);
-        setAttempts(demoAttempts);
+        console.error("Failed to fetch performance", err);
+        setStats(null);
+        setAttempts([]);
       }
       setLoading(false);
     };
+
     fetchPerformance();
-  }, []);
+  }, [user]);
 
   return (
     <div

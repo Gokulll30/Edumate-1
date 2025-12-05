@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const storedUser = localStorage.getItem('edumate_user');
       console.log('Stored user from localStorage:', storedUser); // Debug log
-      
+
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         console.log('Parsed user:', parsedUser); // Debug log
@@ -67,10 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: data.user.email || usernameOrEmail,
           username: data.user.username
         };
-        
+
         console.log('Setting user:', userData); // Debug log
         setUser(userData);
         localStorage.setItem('edumate_user', JSON.stringify(userData));
+        if (data.token) {
+          localStorage.setItem('authToken', data.token);
+        }
         setShowAuthModal(false);
       } else {
         throw new Error(data.error || 'Login failed');
@@ -99,10 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: data.user.email || email,
           username: data.user.username
         };
-        
+
         console.log('Setting user after signup:', userData); // Debug log
         setUser(userData);
         localStorage.setItem('edumate_user', JSON.stringify(userData));
+        if (data.token) {
+          localStorage.setItem('authToken', data.token);
+        }
         setShowAuthModal(false);
       } else {
         throw new Error(data.error || 'Signup failed');
@@ -117,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('Logging out user'); // Debug log
     setUser(null);
     localStorage.removeItem('edumate_user');
+    localStorage.removeItem('authToken');
+    sessionStorage.removeItem('edumate_quiz_state');
   };
 
   return (

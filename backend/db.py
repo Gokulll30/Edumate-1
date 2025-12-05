@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 from typing import Optional, Dict, List, Any
 from flask import g
+from decimal import Decimal
 
 # MySQL connection pool variable
 DB_POOL = None
@@ -265,6 +266,7 @@ def get_user_by_username(username: str) -> Optional[Dict]:
     row = cur.fetchone()
     cur.close()
     return row
+
 def get_user_email_by_id(user_id: int) -> str:
     conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
@@ -523,8 +525,6 @@ def toggle_study_completion(session_id: int, user_id: int, force_completed: bool
     outrow = cur.fetchone()
     cur.close()
     return outrow
-
-from decimal import Decimal
 
 def compute_progress(user_id: int) -> Dict[str, Any]:
     conn = get_db_connection()

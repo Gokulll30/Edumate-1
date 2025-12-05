@@ -138,7 +138,7 @@ def save_quiz_result():
         if score is None or total_questions is None:
             return jsonify({"success": False, "error": "Missing required quiz result fields"}), 400
 
-        percentage = round((score / total_questions) * 100, 2)
+        percentage = int(round((score / total_questions) * 100))
         conn = get_db_connection()
 
         # Save attempt with authenticated user_id

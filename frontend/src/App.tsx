@@ -10,14 +10,15 @@ import QuizGenerator from "./components/QuizGenerator";
 import QuizPerformance from "./components/QuizPerformance";
 import Navigation from "./components/Navigation";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { QuizProvider } from "./context/QuizContext";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
-  
+
   if (!user) {
     return <Navigate to="/" />;
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-900">
       <Navigation />
@@ -33,60 +34,60 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
 
 function AppContent() {
   const { showAuthModal } = useAuth();
-  
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route 
-            path="/dashboard" 
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/chat" 
+          <Route
+            path="/chat"
             element={
               <ProtectedRoute>
                 <ChatInterface />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/planner" 
+          <Route
+            path="/planner"
             element={
               <ProtectedRoute>
                 <StudyPlanner />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/progress" 
+          <Route
+            path="/progress"
             element={
               <ProtectedRoute>
                 <ProgressTracker />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/quiz" 
+          <Route
+            path="/quiz"
             element={
               <ProtectedRoute>
                 <QuizGenerator />
               </ProtectedRoute>
-            } 
+            }
           />
           {/* FIXED: Added the missing quiz-performance route */}
-          <Route 
-            path="/quiz-performance" 
+          <Route
+            path="/quiz-performance"
             element={
               <ProtectedRoute>
                 <QuizPerformance />
               </ProtectedRoute>
-            } 
+            }
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
@@ -99,7 +100,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <QuizProvider>
+        <AppContent />
+      </QuizProvider>
     </AuthProvider>
   );
 }
