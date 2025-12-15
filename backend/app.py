@@ -157,12 +157,12 @@ if __name__ == "__main__":
     print("🚀 EDUMATE BACKEND STARTING")
     print("=" * 60)
     # ✅ START CRON JOBS ON SERVER BOOT
-    try:
+    '''try:
         start_agent_cron_job()
         print("✅ AI Agent cron job started")
     except Exception as e:
         print(f"❌ Failed to start cron jobs: {e}")
-    print("\n📋 Registered Routes:")
+    print("\n📋 Registered Routes:")'''
     for rule in app.url_map.iter_rules():
         methods = ",".join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
         print(f" {rule.rule:<40} [{methods}]")
