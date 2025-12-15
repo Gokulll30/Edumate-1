@@ -710,6 +710,108 @@ export const uploadChatFile = async (
   }
 };
 
+// ===== AI AGENT API =====
+
+export interface PerformanceAnalysis {
+  [topic: string]: {
+    averageScore: number;
+    attempts: number;
+    trend: 'improving' | 'declining' | 'stable';
+    masteryLevel: 'novice' | 'intermediate' | 'proficient' | 'expert';
+    lastAttempted: string;
+    recentScores: number[];
+  };
+}
+
+export interface ScheduledTest {
+  id: number;
+  topic: string;
+  scheduled_date: string;
+  difficulty_level: string;
+  reason: string;
+  status: string;
+}
+
+// Run AI Agent cycle (analyzes performance & schedules tests)
+export const runAIAgentCycle = async (): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE}/ai-agent/run-cycle`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to run AI agent cycle');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('AI agent cycle error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to run AI agent',
+    };
+  }
+};
+
+// Get performance analysis
+export const getPerformanceAnalysis = async (): Promise<{
+  success: boolean;
+  data?: PerformanceAnalysis;
+  error?: string;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE}/ai-agent/analysis`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get performance analysis');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Performance analysis error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get analysis',
+    };
+  }
+};
+
+// Get AI-scheduled tests
+export const getScheduledTests = async (): Promise<{
+  success: boolean;
+  data?: ScheduledTest[];
+  error?: string;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE}/ai-agent/scheduled-tests`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get scheduled tests');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Scheduled tests error:', error);
+    return {
+      success: false,
+      data: [],
+      error: error instanceof Error ? error.message : 'Failed to get scheduled tests',
+    };
+  }
+};
+
+
 // ===== HEALTH CHECK =====
 
 export async function checkHealth(): Promise<{ status: string; service: string }> {
