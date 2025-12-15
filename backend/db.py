@@ -225,7 +225,23 @@ def _ensure_tables(conn):
     except mysql.connector.errors.ProgrammingError as e:
         if "Duplicate column name" not in str(e):
             raise
-
+    
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS scheduled_tests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            topic VARCHAR(255) NOT NULL,
+            scheduled_date DATETIME NOT NULL,
+            difficulty_level VARCHAR(50),
+            reason VARCHAR(255),
+            status VARCHAR(50) DEFAULT 'pending',
+            created_by VARCHAR(50) DEFAULT 'ai_agent',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            INDEX idx_user_status (user_id, status),
+            INDEX idx_scheduled_date (scheduled_date)
+        )
+    """)
 
     conn.commit()
     cur.close()
