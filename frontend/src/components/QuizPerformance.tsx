@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getQuizStats, runAIAgentCycle } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+
 interface QuizAttempt {
   id: number;
   topic: string;
@@ -14,12 +15,14 @@ interface QuizAttempt {
   taken_at?: string;
 }
 
+
 interface Stats {
   total_attempts: number;
   avg_percentage: number;
   best_score: number;
   last_attempt: string;
 }
+
 
 const difficultyLabels: Record<string, string> = {
   easy: 'Easy',
@@ -28,12 +31,14 @@ const difficultyLabels: Record<string, string> = {
   mixed: 'Mixed',
 };
 
+
 const formatTime = (minutes: number): string => {
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 };
+
 
 export default function QuizPerformance() {
   const { user } = useAuth();
@@ -43,9 +48,11 @@ export default function QuizPerformance() {
   const [loadingAgent, setLoadingAgent] = useState(false);
   const [agentMessage, setAgentMessage] = useState('');
 
+
   useEffect(() => {
     fetchPerformanceData();
   }, [user]);
+
 
   const fetchPerformanceData = async () => {
     try {
@@ -61,6 +68,7 @@ export default function QuizPerformance() {
       setLoading(false);
     }
   };
+
 
   const triggerAIAgent = async () => {
     try {
@@ -88,6 +96,7 @@ export default function QuizPerformance() {
     }
   };
 
+
   if (loading) {
     return (
       <div style={{ padding: '50px', textAlign: 'center', color: '#adb5c4' }}>
@@ -95,6 +104,7 @@ export default function QuizPerformance() {
       </div>
     );
   }
+
 
   return (
     <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -188,7 +198,7 @@ export default function QuizPerformance() {
         </div>
       </div>
 
-            {/* AI Agent Trigger Section */}
+      {/* AI Agent Trigger Section */}
       <div
         style={{
           background: 'rgba(50, 100, 200, 0.1)',
