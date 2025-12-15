@@ -91,27 +91,28 @@ export default function QuizPerformance() {
 
       if (response.success) {
         setAgentMessage('✅ AI recommendations updated! New tests scheduled.');
-        // Refresh data
+        // Refresh data after 1.5 seconds
         setTimeout(() => {
           fetchPerformanceData();
-        }, 1000);
+          setAgentMessage('');
+        }, 1500);
       } else {
         setAgentMessage('❌ Failed to update AI recommendations');
+        setTimeout(() => setAgentMessage(''), 5000);
       }
     } catch (error) {
+      console.error('Error triggering AI agent:', error);
       setAgentMessage('❌ Error triggering AI agent');
-      console.error('Error:', error);
+      setTimeout(() => setAgentMessage(''), 5000);
     } finally {
       setLoadingAgent(false);
-      // Clear message after 5 seconds
-      setTimeout(() => setAgentMessage(''), 5000);
     }
   };
 
   if (loading) {
     return (
-      <div className="quiz-performance-container">
-        <div className="loading">Loading performance data...</div>
+      <div style={{ padding: '50px', textAlign: 'center', color: '#adb5c4' }}>
+        Loading performance data...
       </div>
     );
   }
