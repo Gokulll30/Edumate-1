@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getQuizPerformance, runAIAgentCycle, getPerformanceAnalysis, getScheduledTests } from '../services/api';
-import type { PerformanceAnalysis, ScheduledTest } from '../services/api';
+import { getQuizPerformance } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import '../styles/QuizPerformance.css';
 
 interface QuizAttempt {
   id: number;
@@ -34,46 +32,28 @@ const formatTime = (minutes: number): string => {
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  return `${hours}h ${mins}m`;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 };
 
 export default function QuizPerformance() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [history, setHistory] = useState<QuizAttempt[]>([]);
-  const [analysis, setAnalysis] = useState<PerformanceAnalysis | null>(null);
-  const [scheduledTests, setScheduledTests] = useState<ScheduledTest[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingAgent, setLoadingAgent] = useState(false);
   const [agentMessage, setAgentMessage] = useState('');
 
   useEffect(() => {
-    if (user) {
-      fetchPerformanceData();
-    }
-  }, [user]);
+    fetchPerformanceData();
+  }, []);
 
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch quiz performance
-      const perfResponse = await getQuizPerformance();
-      if (perfResponse.success) {
-        setStats(perfResponse.stats || null);
-        setHistory(perfResponse.history || []);
-      }
-
-      // Fetch AI analysis
-      const analysisResponse = await getPerformanceAnalysis();
-      if (analysisResponse.success) {
-        setAnalysis(analysisResponse.data || null);
-      }
-
-      // Fetch scheduled tests
-      const testsResponse = await getScheduledTests();
-      if (testsResponse.success) {
-        setScheduledTests(testsResponse.data || []);
+      const response = await getQuizPerformance();
+      if (response.success) {
+        setStats(response.stats || null);
+        setHistory(response.history || []);
       }
     } catch (error) {
       console.error('Error fetching performance data:', error);
@@ -87,34 +67,39 @@ export default function QuizPerformance() {
       setLoadingAgent(true);
       setAgentMessage('🤖 Analyzing your performance...');
 
-      const response = await runAIAgentCycle();
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/ai-agent/run-cycle`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (response.success) {
-        setAgentMessage('✅ AI recommendations updated! New tests scheduled.');
-        // Refresh data after 1.5 seconds
+      const data = await response.json();
+
+      if (data.success) {
+        setAgentMessage('✅ AI recommendations updated!');
         setTimeout(() => {
           fetchPerformanceData();
-          setAgentMessage('');
         }, 1500);
       } else {
-        setAgentMessage('❌ Failed to update AI recommendations');
-        setTimeout(() => setAgentMessage(''), 5000);
+        setAgentMessage('❌ Failed to update recommendations');
       }
     } catch (error) {
-      console.error('Error triggering AI agent:', error);
+      console.error('Error:', error);
       setAgentMessage('❌ Error triggering AI agent');
-      setTimeout(() => setAgentMessage(''), 5000);
     } finally {
       setLoadingAgent(false);
+      setTimeout(() => setAgentMessage(''), 5000);
     }
   };
 
   if (loading) {
-    return (
-      <div style={{ padding: '50px', textAlign: 'center', color: '#adb5c4' }}>
-        Loading performance data...
-      </div>
-    );
+    return <div style={{ padding: '50px', textAlign: 'center' }}>Loading...</div>;
   }
 
   return (
@@ -150,114 +135,89 @@ export default function QuizPerformance() {
         </div>
       </div>
 
-      {/* AI Agent Control Section */}
-      <div className="ai-agent-section">
+      {/* AI Agent Button */}
+      <div style={{ 
+        background: 'rgba(50, 100, 200, 0.1)', 
+        borderRadius: '12px', 
+        padding: '20px', 
+        marginBottom: '30px',
+        textAlign: 'center'
+      }}>
         <button
           onClick={triggerAIAgent}
           disabled={loadingAgent}
-          className="btn-ai-agent"
+          style={{
+            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            color: 'white',
+            border: 'none',
+            padding: '12px 30px',
+            borderRadius: '8px',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: loadingAgent ? 'not-allowed' : 'pointer',
+            opacity: loadingAgent ? 0.6 : 1,
+          }}
         >
           {loadingAgent ? '⏳ Analyzing...' : '🤖 Update AI Recommendations'}
         </button>
 
         {agentMessage && (
-          <div className={`agent-message ${agentMessage.includes('✅') ? 'success' : 'error'}`}>
+          <div style={{
+            marginTop: '15px',
+            padding: '10px 15px',
+            borderRadius: '6px',
+            color: agentMessage.includes('✅') ? '#86efac' : '#fca5a5',
+            background: agentMessage.includes('✅') 
+              ? 'rgba(34, 197, 94, 0.2)' 
+              : 'rgba(239, 68, 68, 0.2)',
+          }}>
             {agentMessage}
           </div>
         )}
       </div>
 
-      {/* Scheduled Tests Section */}
-      {scheduledTests && scheduledTests.length > 0 && (
-        <div className="scheduled-tests-section">
-          <h2>📅 AI-Scheduled Tests</h2>
-          <div className="scheduled-tests-grid">
-            {scheduledTests.map((test) => (
-              <div key={test.id} className="scheduled-test-card">
-                <h4>{test.topic}</h4>
-                <p><strong>Difficulty:</strong> {test.difficulty_level}</p>
-                <p><strong>Scheduled:</strong> {new Date(test.scheduled_date).toLocaleDateString()}</p>
-                <p className="reason">
-                  <strong>Reason:</strong> {test.reason.replace(/_/g, ' ')}
-                </p>
-                <button onClick={() => alert(`Start quiz for ${test.topic}`)} className="btn-start-quiz">
-                  Start Quiz
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Performance Analysis by Topic */}
-      {analysis && Object.keys(analysis).length > 0 && (
-        <div className="topic-analysis-section">
-          <h2>📊 Performance by Topic</h2>
-          <div className="topic-cards-grid">
-            {Object.entries(analysis).map(([topic, stats]) => (
-              <div key={topic} className={`topic-card ${stats.trend}`}>
-                <h4>{topic}</h4>
-                <p className="score">Score: <strong>{stats.averageScore}%</strong></p>
-                <p>Attempts: {stats.attempts}</p>
-                <p className={`trend ${stats.trend}`}>
-                  Trend: {stats.trend === 'improving' ? '📈' : stats.trend === 'declining' ? '📉' : '➡️'} {stats.trend}
-                </p>
-                <span className={`mastery-badge ${stats.masteryLevel}`}>
-                  {stats.masteryLevel}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Quiz History */}
-      <div className="quiz-history-section">
-        <h2>Quiz History</h2>
-        <div className="quiz-history-controls">
-          <button onClick={fetchPerformanceData} className="btn-refresh">
-            🔄 Refresh
-          </button>
-          <span className="track-progress">Track your progress!</span>
-        </div>
+      <h2>Quiz History</h2>
+      <button onClick={fetchPerformanceData}>🔄 Refresh</button>
 
-        {history && history.length > 0 ? (
-          <div className="quiz-history-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Topic</th>
-                  <th>Diff.</th>
-                  <th>Score</th>
-                  <th>%</th>
-                  <th>Time</th>
-                  <th>Date</th>
+      {history && history.length > 0 ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            marginTop: '20px',
+          }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid rgba(156, 124, 255, 0.3)' }}>
+                <th style={{ padding: '15px', textAlign: 'left' }}>Topic</th>
+                <th style={{ padding: '15px', textAlign: 'left' }}>Diff.</th>
+                <th style={{ padding: '15px', textAlign: 'left' }}>Score</th>
+                <th style={{ padding: '15px', textAlign: 'left' }}>%</th>
+                <th style={{ padding: '15px', textAlign: 'left' }}>Time</th>
+                <th style={{ padding: '15px', textAlign: 'left' }}>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((attempt) => (
+                <tr key={attempt.id} style={{ borderBottom: '1px solid rgba(156, 124, 255, 0.1)' }}>
+                  <td style={{ padding: '12px 15px' }}>{attempt.topic}</td>
+                  <td style={{ padding: '12px 15px' }}>{difficultyLabels[attempt.difficulty]}</td>
+                  <td style={{ padding: '12px 15px' }}>{attempt.score}/{attempt.total_questions}</td>
+                  <td style={{ padding: '12px 15px', color: attempt.percentage >= 70 ? '#86efac' : '#fca5a5' }}>
+                    {attempt.percentage}%
+                  </td>
+                  <td style={{ padding: '12px 15px' }}>{formatTime(attempt.time_taken || 0)}</td>
+                  <td style={{ padding: '12px 15px' }}>{new Date(attempt.created_at ?? attempt.taken_at ?? '').toLocaleDateString()}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {history.map((attempt) => (
-                  <tr key={attempt.id}>
-                    <td>{attempt.topic}</td>
-                    <td>{difficultyLabels[attempt.difficulty] || attempt.difficulty}</td>
-                    <td>{attempt.score}/{attempt.total_questions}</td>
-                    <td className={attempt.percentage >= 70 ? 'pass' : 'fail'}>
-                      {attempt.percentage}%
-                    </td>
-                    <td>{formatTime(attempt.time_taken || 0)}</td>
-                    <td>{new Date(attempt.created_at ?? attempt.taken_at ?? '').toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="no-history">
-            <p>💡 No quizzes attempted yet.</p>
-          </div>
-        )}
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p>💡 No quizzes attempted yet.</p>
+      )}
 
-      <div className="tip-section">
+      <div style={{ marginTop: '30px', padding: '20px', background: 'rgba(100, 200, 100, 0.1)', borderRadius: '8px' }}>
         💡 Keep practicing to improve your scores!
       </div>
     </div>
