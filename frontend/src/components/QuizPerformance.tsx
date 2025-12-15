@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getQuizPerformance, runAIAgentCycle } from '../services/api';
+import { getQuizStats, runAIAgentCycle } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 interface QuizAttempt {
@@ -50,7 +50,7 @@ export default function QuizPerformance() {
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      const response = await getQuizPerformance();
+      const response = await getQuizStats();
       if (response.success) {
         setStats(response.stats || null);
         setHistory(response.history || []);
