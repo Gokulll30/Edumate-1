@@ -429,5 +429,3 @@ export default function QuizPerformance() {
     </div>
   );
 }
-
-export default QuizPerformance;
