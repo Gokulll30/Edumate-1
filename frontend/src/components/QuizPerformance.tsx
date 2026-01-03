@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getQuizStats, runAIAgentCycle } from '../services/api';
+import { getQuizStats, getQuizHistory, runAIAgentCycle } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 
@@ -57,10 +57,19 @@ export default function QuizPerformance() {
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      const response = await getQuizStats();
-      if (response.success) {
-        setStats(response.stats || null);
-        setHistory(response.history || []);
+
+      // Fetch both stats and history
+      const [statsResponse, historyResponse] = await Promise.all([
+        getQuizStats(),
+        getQuizHistory()
+      ]);
+
+      if (statsResponse.success) {
+        setStats(statsResponse.data || null);
+      }
+      
+      if (historyResponse.success) {
+        setHistory(historyResponse.data || []);
       }
     } catch (error) {
       console.error('Error fetching performance data:', error);
@@ -246,7 +255,6 @@ export default function QuizPerformance() {
               padding: '12px 15px',
               borderRadius: '6px',
               fontWeight: '600',
-              animation: 'slideIn 0.3s ease',
               color: agentMessage.includes('✅') ? '#86efac' : '#fca5a5',
               background: agentMessage.includes('✅')
                 ? 'rgba(34, 197, 94, 0.2)'
