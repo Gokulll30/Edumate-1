@@ -1,7 +1,8 @@
-# backend/ai_agent/service.py
+# backend/ai_agent/service.py (OPTIMIZED - ONLY 1 GEMINI CALL FOR STUDY PLAN)
 
 """
-AI Agent Service - Gemini-powered adaptive testing and scheduling (no brute-force thresholds)
+AI Agent Service - Only uses Gemini for final study plan recommendations
+(Avoids free tier rate limit: 5 calls/min)
 """
 
 from db import get_db_connection
@@ -25,13 +26,14 @@ class AIAgentService:
     @staticmethod
     def run_agent_cycle(user_id: int) -> dict:
         """
-        Main agent cycle - use Gemini AI to analyze and schedule intelligently
+        Main agent cycle - ONLY 1 Gemini API call (for study plan)
+        Everything else uses rule-based logic
         """
         try:
-            print(f"\n[🤖 AI Agent] ========== STARTING GEMINI-POWERED CYCLE FOR USER {user_id} ==========")
+            print(f"\n[🤖 AI Agent] ========== STARTING OPTIMIZED CYCLE FOR USER {user_id} ==========")
 
-            # Step 1: Analyze performance
-            print("[🤖 AI Agent] Step 1: Analyzing performance with AI...")
+            # Step 1: Analyze performance (rule-based, NO Gemini)
+            print("[🤖 AI Agent] Step 1: Analyzing performance...")
             analysis = PerformanceAnalyzer.analyze_user_performance(user_id)
             
             if not analysis or len(analysis) == 0:
@@ -43,21 +45,21 @@ class AIAgentService:
 
             print("[🤖 AI Agent] ✅ Performance analyzed")
 
-            # Step 2: Identify weak and strong topics
-            print("[🤖 AI Agent] Step 2: Identifying weak/strong topics with AI...")
+            # Step 2: Identify weak and strong topics (rule-based, NO Gemini)
+            print("[🤖 AI Agent] Step 2: Identifying weak/strong topics...")
             weak_topics = PerformanceAnalyzer.identify_weak_topics(user_id)
             strong_topics = PerformanceAnalyzer.identify_strong_topics(user_id)
             print(f"[🤖 AI Agent] ✅ Found {len(weak_topics)} weak topics, {len(strong_topics)} strong topics")
 
-            # Step 3: Generate Gemini-powered recommendations
-            print("[🤖 AI Agent] Step 3: Generating AI recommendations...")
-            recommendations = AIAgentService._generate_gemini_recommendations(
+            # Step 3: Generate Gemini study plan (ONLY 1 API CALL)
+            print("[🤖 AI Agent] Step 3: Generating AI study plan...")
+            recommendations = AIAgentService._generate_gemini_study_plan(
                 user_id, analysis, weak_topics, strong_topics
             )
-            print("[🤖 AI Agent] ✅ Recommendations generated")
+            print("[🤖 AI Agent] ✅ Study plan generated")
 
-            # Step 4: Schedule adaptive tests
-            print("[🤖 AI Agent] Step 4: Scheduling AI-optimized tests...")
+            # Step 4: Schedule adaptive tests (rule-based scheduling)
+            print("[🤖 AI Agent] Step 4: Scheduling adaptive tests...")
             scheduled_tests = AIAgentService._schedule_adaptive_tests(user_id, recommendations)
             print(f"[🤖 AI Agent] ✅ Scheduled {len(scheduled_tests)} tests")
 
@@ -77,10 +79,13 @@ class AIAgentService:
             raise
 
     @staticmethod
-    def _generate_gemini_recommendations(user_id: int, analysis: dict, weak_topics: list, strong_topics: list) -> dict:
-        """Generate intelligent recommendations using Gemini AI"""
+    def _generate_gemini_study_plan(user_id: int, analysis: dict, weak_topics: list, strong_topics: list) -> dict:
+        """
+        ONLY GEMINI CALL IN THE ENTIRE CYCLE
+        Generate intelligent study plan using Gemini
+        """
         try:
-            print("[AI Agent] Using Gemini AI for intelligent recommendations")
+            print("[AI Agent] Calling Gemini for study plan (1 API call)...")
 
             # Build context for Gemini
             weak_topics_summary = "\n".join([
@@ -93,7 +98,7 @@ class AIAgentService:
                 for t in strong_topics[:3]
             ])
 
-            prompt = f"""You are an expert educational AI coach. Analyze this student's performance and provide learning recommendations.
+            prompt = f"""You are an expert educational AI coach. Analyze this student's performance and provide a study plan.
 
 Weak Topics (need improvement):
 {weak_topics_summary if weak_topics_summary else 'None yet'}
@@ -101,7 +106,7 @@ Weak Topics (need improvement):
 Strong Topics (maintain mastery):
 {strong_topics_summary if strong_topics_summary else 'None yet'}
 
-Generate a structured study plan. Return JSON:
+Generate a study plan with specific recommendations. Return ONLY this JSON (no markdown):
 {{
   "priority_topics": [
     {{
@@ -121,9 +126,7 @@ Generate a structured study plan. Return JSON:
     }}
   ],
   "overall_feedback": "1-2 sentence encouraging feedback with specific next steps"
-}}
-
-Return ONLY JSON, no markdown."""
+}}"""
 
             response = gemini_client.models.generate_content(
                 model="gemini-2.5-flash",
@@ -140,8 +143,8 @@ Return ONLY JSON, no markdown."""
             }
 
         except Exception as e:
-            print(f"[AI Agent] Error generating Gemini recommendations: {str(e)}")
-            # Fallback to basic recommendations
+            print(f"[AI Agent] ⚠️ Gemini call failed, using rule-based fallback: {str(e)}")
+            # FALLBACK: Use simple rule-based recommendations
             return {
                 'priorityTopics': [
                     {
@@ -167,7 +170,7 @@ Return ONLY JSON, no markdown."""
 
     @staticmethod
     def _schedule_adaptive_tests(user_id: int, recommendations: dict) -> list:
-        """Schedule adaptive tests in database based on Gemini recommendations"""
+        """Schedule adaptive tests in database based on recommendations"""
         try:
             conn = get_db_connection()
             cur = conn.cursor()
@@ -234,4 +237,4 @@ Return ONLY JSON, no markdown."""
 
         except Exception as e:
             print(f"[AI Agent] Error scheduling tests: {str(e)}")
-            raise   
+            raise
