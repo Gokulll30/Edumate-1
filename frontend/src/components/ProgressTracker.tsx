@@ -1,661 +1,315 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import Navigation from './Navigation';
+import { TrendingUp, Target, Award, Clock, BookOpen, Brain } from 'lucide-react';
 
-interface Achievement {
-  id: number;
-  title: string;
-  description: string;
-  completed: boolean;
-  completedDate?: string;
-}
-
-interface SubjectProgress {
+// Data interfaces remain unchanged
+interface Subject {
   name: string;
   progress: number;
   totalHours: number;
   completedSessions: number;
   averageScore: number;
+  color: string;
 }
 
-interface ScheduledTest {
-  id: number;
-  topic: string;
-  scheduled_date: string;
-  difficulty_level: string;
-  reason: string;
-  status: string;
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  completed: boolean;
+  completedDate?: string;
 }
 
-interface OverallStats {
-  totalHours: number;
-  averageScore: number;
-  completedAchievements: number;
-  studyStreak: number;
-}
+export default function ProgressTracker() {
+  const [selectedPeriod, setSelectedPeriod] = useState('month');
 
-const ProgressTracker: React.FC = () => {
-  const [overallStats, setOverallStats] = useState<OverallStats>({
-    totalHours: 0,
-    averageScore: 0,
-    completedAchievements: 0,
-    studyStreak: 0,
-  });
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [subjects, setSubjects] = useState<SubjectProgress[]>([]);
-  const [scheduledTests, setScheduledTests] = useState<ScheduledTest[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Set this to true for showing active data every time
+  const userHasData = true;
 
-  useEffect(() => {
-    fetchProgressData();
-  }, []);
+  const subjects: Subject[] = [
+    { name: 'Computer Science', progress: 82, totalHours: 28.5, completedSessions: 21, averageScore: 88, color: 'purple' },
+    { name: 'Mathematics', progress: 70, totalHours: 19.9, completedSessions: 16, averageScore: 79, color: 'blue' },
+    { name: 'Database Systems', progress: 94, totalHours: 21.2, completedSessions: 14, averageScore: 92, color: 'green' },
+    { name: 'Machine Learning', progress: 57, totalHours: 13.1, completedSessions: 9, averageScore: 81, color: 'orange' }
+  ];
 
-  const fetchProgressData = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('auth_token');
-
-      if (!token) {
-        console.error('No auth token found');
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
-
-      // Fetch overall stats
-      try {
-        const statsRes = await fetch('/api/progress/stats', { headers });
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setOverallStats(statsData.data || overallStats);
-        }
-      } catch (err) {
-        console.error('Error fetching stats:', err);
-      }
-
-      // Fetch achievements
-      try {
-        const achievementsRes = await fetch('/api/achievements', { headers });
-        if (achievementsRes.ok) {
-          const achievementsData = await achievementsRes.json();
-          setAchievements(achievementsData.data || []);
-        }
-      } catch (err) {
-        console.error('Error fetching achievements:', err);
-      }
-
-      // Fetch subject progress
-      try {
-        const subjectsRes = await fetch('/api/subjects/progress', { headers });
-        if (subjectsRes.ok) {
-          const subjectsData = await subjectsRes.json();
-          setSubjects(subjectsData.data || []);
-        }
-      } catch (err) {
-        console.error('Error fetching subjects:', err);
-      }
-
-      // Fetch scheduled tests (AI-scheduled) - NEW
-      try {
-        const testsRes = await fetch('/api/ai-agent/scheduled-tests', { headers });
-        if (testsRes.ok) {
-          const testsData = await testsRes.json();
-          setScheduledTests(testsData.data || []);
-        }
-      } catch (err) {
-        console.error('Error fetching scheduled tests:', err);
-      }
-    } catch (err) {
-      console.error('Error fetching progress data:', err);
-    } finally {
-      setLoading(false);
+  const achievements: Achievement[] = [
+    {
+      id: '1',
+      title: 'Study Streak Master',
+      description: 'Study for 7 consecutive days',
+      icon: Award,
+      completed: true,
+      completedDate: '2025-11-12'
+    },
+    {
+      id: '2',
+      title: 'Quiz Champion',
+      description: 'Score above 90% in 5 quizzes',
+      icon: Target,
+      completed: true,
+      completedDate: '2025-11-10'
+    },
+    {
+      id: '3',
+      title: 'Time Master',
+      description: 'Study for 50+ hours this month',
+      icon: Clock,
+      completed: false
+    },
+    {
+      id: '4',
+      title: 'Knowledge Seeker',
+      description: 'Complete 100 study sessions',
+      icon: BookOpen,
+      completed: false
+    },
+    {
+      id: '5',
+      title: 'AI Assistant Pro',
+      description: 'Use AI chat for 30+ conversations',
+      icon: Brain,
+      completed: true,
+      completedDate: '2025-11-13'
     }
+  ];
+
+  const weeklyData = [
+    { day: 'Mon', hours: 3.8, score: 87 },
+    { day: 'Tue', hours: 2.4, score: 91 },
+    { day: 'Wed', hours: 4.1, score: 84 },
+    { day: 'Thu', hours: 3.6, score: 88 },
+    { day: 'Fri', hours: 2.9, score: 93 },
+    { day: 'Sat', hours: 5.5, score: 80 },
+    { day: 'Sun', hours: 4.2, score: 89 }
+  ];
+
+  const getSubjectColor = (color: string) => {
+    const colors = {
+      purple: 'bg-purple-500',
+      blue: 'bg-blue-500',
+      green: 'bg-green-500',
+      orange: 'bg-orange-500'
+    };
+    return colors[color as keyof typeof colors];
+  };
+  const getSubjectBgColor = (color: string) => {
+    const colors = {
+      purple: 'bg-purple-500/20 border-purple-500/30',
+      blue: 'bg-blue-500/20 border-blue-500/30',
+      green: 'bg-green-500/20 border-green-500/30',
+      orange: 'bg-orange-500/20 border-orange-500/30'
+    };
+    return colors[color as keyof typeof colors];
   };
 
-  const getDifficultyColor = (difficulty: string): string => {
-    switch (difficulty?.toLowerCase()) {
-      case 'easy':
-        return '#10b981';
-      case 'medium':
-        return '#f59e0b';
-      case 'hard':
-        return '#ef4444';
-      default:
-        return '#6b7280';
-    }
+  const overallStats = {
+    totalHours: subjects.reduce((acc, s) => acc + s.totalHours, 0),
+    averageScore: Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length),
+    completedAchievements: achievements.filter(a => a.completed).length,
+    studyStreak: 9
   };
-
-  const formatDate = (dateString: string): string => {
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.loadingText}>Loading your progress...</div>
-      </div>
-    );
-  }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>📊 Your Learning Journey</h1>
-        <p style={styles.subtitle}>Monitor your progress and achievements</p>
-      </div>
+    <div className="min-h-screen bg-gray-900">
+      <Navigation />
 
-      {/* Overall Stats Section */}
-      <section style={styles.statsSection}>
-        <div style={styles.statCard}>
-          <div style={styles.statValue}>{overallStats.totalHours.toFixed(1)}h</div>
-          <div style={styles.statLabel}>Total Hours</div>
-        </div>
-        <div style={styles.statCard}>
-          <div style={styles.statValue}>{overallStats.averageScore}%</div>
-          <div style={styles.statLabel}>Average Score</div>
-        </div>
-        <div style={styles.statCard}>
-          <div style={styles.statValue}>
-            {overallStats.completedAchievements}/{achievements.length}
+      <main className="ml-64 p-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Progress Tracker</h1>
+            <p className="text-slate-400">Monitor your learning journey and achievements</p>
           </div>
-          <div style={styles.statLabel}>Achievements</div>
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-600 focus:outline-none focus:border-purple-500"
+          >
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+          </select>
         </div>
-        <div style={styles.statCard}>
-          <div style={styles.statValue}>{overallStats.studyStreak}</div>
-          <div style={styles.statLabel}>Day Streak</div>
+
+        {/* Overall Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mr-4">
+              <Clock className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {overallStats.totalHours.toFixed(1)}h
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Total Hours</p>
+            </div>
+          </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mr-4">
+              <Target className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {overallStats.averageScore}%
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Average Score</p>
+            </div>
+          </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center mr-4">
+              <Award className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {overallStats.completedAchievements}/{achievements.length}
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Achievements</p>
+            </div>
+          </div>
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex items-center shadow">
+            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mr-4">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {overallStats.studyStreak}
+              </p>
+              <p className="text-slate-400 text-sm font-semibold">Day Streak</p>
+            </div>
+          </div>
         </div>
-      </section>
 
-      {/* AI-Scheduled Tests Section - NEW */}
-      {scheduledTests.length > 0 && (
-        <section style={styles.aiTestsSection}>
-          <h2 style={styles.sectionTitle}>🤖 AI-Scheduled Tests</h2>
-          <p style={styles.sectionSubtitle}>
-            {scheduledTests.length} test{scheduledTests.length !== 1 ? 's' : ''} scheduled by AI Agent
-          </p>
-
-          <div style={styles.testsContainer}>
-            {scheduledTests.map((test) => (
-              <div key={test.id} style={styles.testCard}>
-                <div style={styles.testCardHeader}>
-                  <h3 style={styles.testCardTitle}>{test.topic}</h3>
-                  <span
-                    style={{
-                      ...styles.difficultyBadge,
-                      backgroundColor: getDifficultyColor(test.difficulty_level),
-                    }}
-                  >
-                    {test.difficulty_level.charAt(0).toUpperCase() +
-                      test.difficulty_level.slice(1)}
-                  </span>
-                </div>
-
-                <div style={styles.testCardDetails}>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>📅 Scheduled:</span>
-                    <span style={styles.detailValue}>{formatDate(test.scheduled_date)}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>💡 Reason:</span>
-                    <span style={styles.detailValue}>{test.reason || 'AI-recommended'}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>✓ Status:</span>
-                    <span style={styles.statusBadge}>{test.status}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Weekly Activity Chart */}
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+            <h3 className="text-xl font-semibold text-white mb-6">Weekly Activity</h3>
+            <div className="space-y-4">
+              {weeklyData.map((day, index) => (
+                <div key={day.day} className="flex items-center space-x-4">
+                  <span className="text-slate-400 text-sm w-8">{day.day}</span>
+                  <div className="flex flex-1 items-center gap-3">
+                    <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${(day.hours / 6) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-white text-sm w-10">{day.hours}h</span>
+                    <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${day.score}%` }}
+                      />
+                    </div>
+                    <span className="text-white text-sm w-10">{day.score}%</span>
                   </div>
                 </div>
-
-                <div style={styles.testCardActions}>
-                  <button style={styles.btnPrimary}>Take Test</button>
-                  <button style={styles.btnSecondary}>Reschedule</button>
-                </div>
+              ))}
+            </div>
+            <div className="flex justify-center space-x-6 mt-6 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+                <span className="text-slate-400">Study Hours</span>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {scheduledTests.length === 0 && (
-        <section style={styles.emptySection}>
-          <p style={styles.emptyText}>📌 No AI-scheduled tests yet</p>
-          <p style={styles.emptySubtext}>
-            Generate AI recommendations to create a personalized study schedule
-          </p>
-        </section>
-      )}
-
-      {/* Weekly Activity Section */}
-      <section style={styles.activitySection}>
-        <h2 style={styles.sectionTitle}>📈 Weekly Activity</h2>
-        <p style={styles.activityPlaceholder}>Weekly activity chart coming soon</p>
-      </section>
-
-      {/* Achievements Section */}
-      <section style={styles.achievementsSection}>
-        <h2 style={styles.sectionTitle}>🏆 Achievements</h2>
-
-        {achievements.length > 0 ? (
-          <div style={styles.achievementsGrid}>
-            {achievements.map((achievement) => (
-              <div
-                key={achievement.id}
-                style={{
-                  ...styles.achievementCard,
-                  ...(achievement.completed
-                    ? styles.achievementCardCompleted
-                    : styles.achievementCardLocked),
-                }}
-              >
-                <h3 style={styles.achievementTitle}>{achievement.title}</h3>
-                <p style={styles.achievementDescription}>{achievement.description}</p>
-                {achievement.completed && achievement.completedDate && (
-                  <p style={styles.achievementDate}>
-                    Completed on {new Date(achievement.completedDate).toLocaleDateString()}
-                  </p>
-                )}
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+                <span className="text-slate-400">Average Score</span>
               </div>
-            ))}
+            </div>
           </div>
-        ) : (
-          <p style={styles.noDataText}>No achievements yet. Keep studying!</p>
-        )}
-      </section>
 
-      {/* Subject Progress Section */}
-      <section style={styles.subjectsSection}>
-        <h2 style={styles.sectionTitle}>📚 Subject Progress</h2>
-
-        {subjects.length > 0 ? (
-          <div style={styles.subjectsGrid}>
-            {subjects.map((subject) => (
-              <div key={subject.name} style={styles.subjectCard}>
-                <h3 style={styles.subjectTitle}>{subject.name}</h3>
-
-                <div style={styles.progressBar}>
+          {/* Achievements */}
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+            <h3 className="text-xl font-semibold text-white mb-6">Achievements</h3>
+            <div className="space-y-4">
+              {achievements.map((achievement) => {
+                const Icon = achievement.icon;
+                return (
                   <div
-                    style={{
-                      ...styles.progressFill,
-                      width: `${subject.progress}%`,
-                    }}
-                  ></div>
-                </div>
-                <p style={styles.progressPercentage}>{subject.progress}% Complete</p>
+                    key={achievement.id}
+                    className={`p-4 rounded-lg border flex items-center space-x-4 transition-all duration-300 ${
+                      achievement.completed
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-slate-700/30 border-slate-600/50'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                        achievement.completed ? 'bg-green-500' : 'bg-slate-600'
+                      }`}>
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className={`font-semibold ${achievement.completed ? 'text-white' : 'text-slate-300'}`}>
+                        {achievement.title}
+                      </h4>
+                      <p className="text-slate-400 text-sm">{achievement.description}</p>
+                      {achievement.completed && achievement.completedDate && (
+                        <p className="text-green-400 text-xs mt-1">
+                          Completed on {new Date(achievement.completedDate).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    {achievement.completed && (
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
-                <div style={styles.subjectStatsGrid}>
-                  <div style={styles.subjectStat}>
-                    <span style={styles.subjectStatValue}>{subject.totalHours}h</span>
-                    <span style={styles.subjectStatLabel}>Total Hours</span>
+        {/* Subject Progress */}
+        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <h3 className="text-xl font-semibold text-white mb-6">Subject Progress</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {subjects.map((subject, index) => (
+              <div
+                key={index}
+                className={`p-6 rounded-xl border ${getSubjectBgColor(subject.color)}`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-white font-semibold">{subject.name}</h4>
+                  <span className="text-white font-bold">{subject.progress}%</span>
+                </div>
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm text-slate-400 mb-2">
+                    <span>Progress</span>
+                    <span>{subject.progress}%</span>
                   </div>
-                  <div style={styles.subjectStat}>
-                    <span style={styles.subjectStatValue}>{subject.completedSessions}</span>
-                    <span style={styles.subjectStatLabel}>Sessions</span>
+                  <div className="bg-slate-700 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`${getSubjectColor(subject.color)} h-2 rounded-full transition-all duration-500`}
+                      style={{ width: `${subject.progress}%` }}
+                    />
                   </div>
-                  <div style={styles.subjectStat}>
-                    <span style={styles.subjectStatValue}>{subject.averageScore}%</span>
-                    <span style={styles.subjectStatLabel}>Avg Score</span>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-white font-semibold">{subject.totalHours}h</p>
+                    <p className="text-slate-400 text-xs">Total Hours</p>
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold">{subject.completedSessions}</p>
+                    <p className="text-slate-400 text-xs">Sessions</p>
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold">{subject.averageScore}%</p>
+                    <p className="text-slate-400 text-xs">Avg Score</p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <p style={styles.noDataText}>No subject progress yet. Start taking quizzes!</p>
-        )}
-      </section>
-
-      {/* Refresh Button */}
-      <div style={styles.refreshSection}>
-        <button
-          style={{ ...styles.btnRefresh, opacity: loading ? 0.5 : 1 }}
-          onClick={fetchProgressData}
-          disabled={loading}
-        >
-          {loading ? '🔄 Refreshing...' : '🔄 Refresh Progress'}
-        </button>
-      </div>
+        </div>
+      </main>
     </div>
   );
-};
-
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    padding: '2rem',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    backgroundColor: '#f9fafb',
-    minHeight: '100vh',
-  },
-  header: {
-    marginBottom: '3rem',
-    textAlign: 'center',
-  },
-  title: {
-    fontSize: '2.5rem',
-    fontWeight: '700',
-    color: '#1f2937',
-    margin: '0 0 0.5rem 0',
-  },
-  subtitle: {
-    fontSize: '1.1rem',
-    color: '#6b7280',
-    margin: 0,
-  },
-  statsSection: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: '1.5rem',
-    marginBottom: '3rem',
-  },
-  statCard: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '2rem',
-    textAlign: 'center',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  statValue: {
-    fontSize: '2.5rem',
-    fontWeight: '700',
-    color: '#059669',
-    marginBottom: '0.5rem',
-  },
-  statLabel: {
-    fontSize: '0.9rem',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  aiTestsSection: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '2rem',
-    marginBottom: '3rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  sectionTitle: {
-    fontSize: '1.8rem',
-    fontWeight: '700',
-    color: '#1f2937',
-    margin: '0 0 0.5rem 0',
-  },
-  sectionSubtitle: {
-    fontSize: '0.95rem',
-    color: '#6b7280',
-    margin: '0 0 1.5rem 0',
-  },
-  testsContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    gap: '1.5rem',
-  },
-  testCard: {
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #e5e7eb',
-    borderRadius: '10px',
-    padding: '1.5rem',
-    transition: 'all 0.3s ease',
-  },
-  testCardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '1.5rem',
-    gap: '1rem',
-  },
-  testCardTitle: {
-    fontSize: '1.2rem',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: 0,
-    flex: 1,
-  },
-  difficultyBadge: {
-    display: 'inline-block',
-    padding: '0.4rem 0.9rem',
-    borderRadius: '20px',
-    color: '#fff',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-    whiteSpace: 'nowrap',
-    textTransform: 'capitalize',
-  },
-  testCardDetails: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    padding: '1rem',
-    marginBottom: '1.5rem',
-    borderLeft: '3px solid #059669',
-  },
-  detailItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '0.5rem 0',
-    fontSize: '0.95rem',
-    borderBottom: '1px solid #f0f0f0',
-  },
-  detailLabel: {
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  detailValue: {
-    color: '#1f2937',
-    fontWeight: '600',
-    textAlign: 'right',
-  },
-  statusBadge: {
-    display: 'inline-block',
-    padding: '0.3rem 0.8rem',
-    backgroundColor: '#fef3c7',
-    color: '#92400e',
-    borderRadius: '16px',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  testCardActions: {
-    display: 'flex',
-    gap: '0.8rem',
-  },
-  btnPrimary: {
-    flex: 1,
-    padding: '0.6rem 1rem',
-    backgroundColor: '#059669',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    fontSize: '0.95rem',
-    transition: 'background-color 0.3s ease',
-  },
-  btnSecondary: {
-    flex: 1,
-    padding: '0.6rem 1rem',
-    backgroundColor: '#f0f0f0',
-    color: '#1f2937',
-    border: '1px solid #d0d0d0',
-    borderRadius: '6px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    fontSize: '0.95rem',
-    transition: 'background-color 0.3s ease',
-  },
-  emptySection: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '3rem 2rem',
-    textAlign: 'center',
-    marginBottom: '3rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  emptyText: {
-    fontSize: '1.2rem',
-    color: '#1f2937',
-    margin: '0.5rem 0',
-  },
-  emptySubtext: {
-    color: '#9ca3af',
-    fontSize: '0.95rem',
-  },
-  activitySection: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '2rem',
-    marginBottom: '3rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  activityPlaceholder: {
-    color: '#9ca3af',
-    textAlign: 'center',
-    padding: '2rem 0',
-  },
-  achievementsSection: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '2rem',
-    marginBottom: '3rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  achievementsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-    gap: '1.5rem',
-  },
-  achievementCard: {
-    padding: '1.5rem',
-    borderRadius: '10px',
-    textAlign: 'center',
-    border: '2px solid #e5e7eb',
-    transition: 'all 0.3s ease',
-  },
-  achievementCardCompleted: {
-    backgroundColor: '#d1fae5',
-    borderColor: '#059669',
-  },
-  achievementCardLocked: {
-    backgroundColor: '#f9fafb',
-    opacity: 0.6,
-  },
-  achievementTitle: {
-    fontSize: '1rem',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 0.5rem 0',
-  },
-  achievementDescription: {
-    fontSize: '0.9rem',
-    color: '#6b7280',
-    margin: 0,
-  },
-  achievementDate: {
-    fontSize: '0.85rem',
-    color: '#047857',
-    fontWeight: '600',
-    marginTop: '0.8rem',
-  },
-  subjectsSection: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '2rem',
-    marginBottom: '3rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  subjectsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-    gap: '1.5rem',
-  },
-  subjectCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: '10px',
-    padding: '1.5rem',
-    transition: 'all 0.3s ease',
-    border: '1px solid #e5e7eb',
-  },
-  subjectTitle: {
-    fontSize: '1.2rem',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 1rem 0',
-  },
-  progressBar: {
-    height: '8px',
-    backgroundColor: '#e5e7eb',
-    borderRadius: '10px',
-    overflow: 'hidden',
-    marginBottom: '0.5rem',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#059669',
-    borderRadius: '10px',
-    transition: 'width 0.3s ease',
-  },
-  progressPercentage: {
-    fontSize: '0.85rem',
-    color: '#6b7280',
-    margin: '0 0 1rem 0',
-    textAlign: 'right',
-  },
-  subjectStatsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '1rem',
-    textAlign: 'center',
-  },
-  subjectStat: {
-    backgroundColor: '#fff',
-    padding: '0.8rem',
-    borderRadius: '8px',
-    border: '1px solid #e5e7eb',
-  },
-  subjectStatValue: {
-    display: 'block',
-    fontSize: '1.3rem',
-    fontWeight: '700',
-    color: '#059669',
-  },
-  subjectStatLabel: {
-    display: 'block',
-    fontSize: '0.8rem',
-    color: '#6b7280',
-    marginTop: '0.3rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.3px',
-  },
-  refreshSection: {
-    textAlign: 'center',
-    marginBottom: '2rem',
-  },
-  btnRefresh: {
-    padding: '0.8rem 2rem',
-    backgroundColor: '#059669',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    fontSize: '1rem',
-    transition: 'background-color 0.3s ease',
-  },
-  loadingText: {
-    textAlign: 'center',
-    padding: '4rem 2rem',
-    fontSize: '1.1rem',
-    color: '#6b7280',
-  },
-  noDataText: {
-    textAlign: 'center',
-    color: '#9ca3af',
-    padding: '2rem 0',
-  },
-};
-
-export default ProgressTracker;
+}
