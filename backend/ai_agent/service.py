@@ -126,7 +126,7 @@ Generate a structured study plan. Return JSON:
 Return ONLY JSON, no markdown."""
 
             response = gemini_client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
