@@ -1,8 +1,6 @@
-# backend/ai_agent/service.py (OPTIMIZED - ONLY 1 GEMINI CALL FOR STUDY PLAN)
-
+# backend/ai_agent/service.py
 """
-AI Agent Service - Only uses Gemini for final study plan recommendations
-(Avoids free tier rate limit: 5 calls/min)
+AI Agent Service - AI-scheduled tests now integrated with Google Calendar
 """
 
 from db import get_db_connection
@@ -58,7 +56,7 @@ class AIAgentService:
             )
             print("[🤖 AI Agent] ✅ Study plan generated")
 
-            # Step 4: Schedule adaptive tests (rule-based scheduling)
+            # Step 4: Schedule adaptive tests (rule-based scheduling + GCal integration)
             print("[🤖 AI Agent] Step 4: Scheduling adaptive tests...")
             scheduled_tests = AIAgentService._schedule_adaptive_tests(user_id, recommendations)
             print(f"[🤖 AI Agent] ✅ Scheduled {len(scheduled_tests)} tests")
@@ -170,7 +168,7 @@ Generate a study plan with specific recommendations. Return ONLY this JSON (no m
 
     @staticmethod
     def _schedule_adaptive_tests(user_id: int, recommendations: dict) -> list:
-        """Schedule adaptive tests in database based on recommendations"""
+        """Schedule adaptive tests in database AND Google Calendar"""
         try:
             conn = get_db_connection()
             cur = conn.cursor()
@@ -188,7 +186,7 @@ Generate a study plan with specific recommendations. Return ONLY this JSON (no m
             for topic_data in recommendations.get('priorityTopics', []):
                 test_date = now + timedelta(days=topic_data.get('days_until_next_test', 3))
                 reason = f"AI Priority: {topic_data.get('focus_area', 'Weak performance')}"
-                
+
                 try:
                     cur.execute(insert_query, [
                         user_id,
@@ -197,6 +195,20 @@ Generate a study plan with specific recommendations. Return ONLY this JSON (no m
                         topic_data.get('suggested_difficulty', 'medium'),
                         reason
                     ])
+
+                    # CREATE GOOGLE CALENDAR EVENT (NEW)
+                    try:
+                        from calendar_app.routes import create_calendar_event_for_test
+                        create_calendar_event_for_test(
+                            user_id=user_id,
+                            topic=topic_data['topic'],
+                            scheduled_date=test_date,
+                            difficulty=topic_data.get('suggested_difficulty', 'medium')
+                        )
+                        print(f"📅 Created GCal event for {topic_data['topic']}")
+                    except Exception as gcal_error:
+                        print(f"⚠️ GCal creation failed (test still scheduled): {gcal_error}")
+
                     scheduled_tests.append({
                         'topic': topic_data['topic'],
                         'date': str(test_date),
@@ -211,7 +223,7 @@ Generate a study plan with specific recommendations. Return ONLY this JSON (no m
             for topic_data in recommendations.get('reinforcementTopics', []):
                 test_date = now + timedelta(days=topic_data.get('days_until_next_test', 7))
                 reason = "AI Reinforcement: Maintain mastery"
-                
+
                 try:
                     cur.execute(insert_query, [
                         user_id,
@@ -220,6 +232,20 @@ Generate a study plan with specific recommendations. Return ONLY this JSON (no m
                         topic_data.get('suggested_difficulty', 'hard'),
                         reason
                     ])
+
+                    # CREATE GOOGLE CALENDAR EVENT (NEW)
+                    try:
+                        from calendar_app.routes import create_calendar_event_for_test
+                        create_calendar_event_for_test(
+                            user_id=user_id,
+                            topic=topic_data['topic'],
+                            scheduled_date=test_date,
+                            difficulty=topic_data.get('suggested_difficulty', 'hard')
+                        )
+                        print(f"📅 Created GCal event for {topic_data['topic']}")
+                    except Exception as gcal_error:
+                        print(f"⚠️ GCal creation failed (test still scheduled): {gcal_error}")
+
                     scheduled_tests.append({
                         'topic': topic_data['topic'],
                         'date': str(test_date),
