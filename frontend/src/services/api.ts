@@ -1,4 +1,5 @@
 // API Types
+
 export type QuizItem = {
   question: string;
   options: string[];
@@ -42,10 +43,9 @@ export interface QuizQnA {
 }
 
 export interface SaveQuizResultWithAnswersRequest extends QuizResult {
-  user_id?: number; // <-- add this line (optional or required, to match backend)
+  user_id?: number;
   qnas: QuizQnA[];
 }
-
 
 export interface QuizAttempt {
   id: number;
@@ -118,6 +118,48 @@ export interface ChatSession {
   created_at: string;
 }
 
+// Session Types
+export interface Session {
+  id: number;
+  user_id: number;
+  topic: string;
+  date: string;
+  start_time: string;
+  duration: number;
+  status: 'planned' | 'completed' | 'cancelled';
+  notes?: string;
+  created_at: string;
+}
+
+// Calendar Types
+export interface CalendarStatus {
+  success: boolean;
+  connected: boolean;
+  email?: string;
+  error?: string;
+}
+
+// Scheduled Tests Types
+export interface PerformanceAnalysis {
+  [topic: string]: {
+    averageScore: number;
+    attempts: number;
+    trend: 'improving' | 'declining' | 'stable';
+    masteryLevel: 'novice' | 'intermediate' | 'proficient' | 'expert';
+    lastAttempted: string;
+    recentScores: number[];
+  };
+}
+
+export interface ScheduledTest {
+  id: number;
+  topic: string;
+  scheduled_date: string;
+  difficulty_level: string;
+  reason: string;
+  status: string;
+}
+
 // API Base URL
 export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
@@ -136,7 +178,6 @@ export const getAuthHeaders = (): Record<string, string> => {
 };
 
 // ===== AUTHENTICATION API =====
-
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
   try {
     const response = await fetch(`${API_BASE}/auth/login`, {
@@ -146,9 +187,7 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
       },
       body: JSON.stringify(credentials),
     });
-
     const result = await response.json();
-
     if (!response.ok) {
       throw new Error(result.error || 'Login failed');
     }
@@ -177,9 +216,7 @@ export const signup = async (credentials: SignupCredentials): Promise<AuthRespon
       },
       body: JSON.stringify(credentials),
     });
-
     const result = await response.json();
-
     if (!response.ok) {
       throw new Error(result.error || 'Signup failed');
     }
@@ -215,6 +252,7 @@ export const logout = async (): Promise<{ success: boolean }> => {
   } finally {
     localStorage.removeItem('authToken');
   }
+
   return { success: true };
 };
 
@@ -231,9 +269,7 @@ export const verifyToken = async (): Promise<{ valid: boolean; user?: User; erro
         'Authorization': `Bearer ${token}`,
       },
     });
-
     const result = await response.json();
-
     if (!response.ok) {
       localStorage.removeItem('authToken');
       return { valid: false, error: result.error || 'Token verification failed' };
@@ -258,7 +294,6 @@ export const getProfile = async (): Promise<User | null> => {
         'Authorization': `Bearer ${getAuthToken()}`,
       },
     });
-
     if (!response.ok) {
       throw new Error('Failed to get profile');
     }
@@ -267,6 +302,151 @@ export const getProfile = async (): Promise<User | null> => {
   } catch (error) {
     console.error('Get profile error:', error);
     return null;
+  }
+};
+
+// ===== STUDY SESSIONS API =====
+export const getSessions = async (date?: string): Promise<{ success: boolean; sessions: Session[]; error?: string }> => {
+  try {
+    const params = date ? `?date=${date}` : '';
+    const response = await fetch(`${API_BASE}/sessions${params}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch sessions');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Get sessions error:', error);
+    return { success: false, sessions: [], error: error instanceof Error ? error.message : 'Failed to fetch' };
+  }
+};
+
+export const addSession = async (sessionData: {
+  topic: string;
+  date: string;
+  start_time: string;
+  duration: number;
+  notes?: string;
+}): Promise<{ success: boolean; session?: Session; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE}/sessions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(sessionData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to add session');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Add session error:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to add session' };
+  }
+};
+
+export const updateSession = async (sessionId: number, sessionData: Partial<Session>): Promise<{ success: boolean; session?: Session; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(sessionData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update session');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Update session error:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to update session' };
+  }
+};
+
+export const deleteSession = async (sessionId: number): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete session');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Delete session error:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to delete session' };
+  }
+};
+
+// ===== GOOGLE CALENDAR API =====
+export const getCalendarStatus = async (): Promise<CalendarStatus> => {
+  try {
+    const response = await fetch(`${API_BASE}/calendar_app/status`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to get calendar status');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Calendar status error:', error);
+    return { success: false, connected: false, error: error instanceof Error ? error.message : 'Failed to get status' };
+  }
+};
+
+export const connectCalendar = async (): Promise<{ success: boolean; authUrl?: string; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE}/calendar_app/connect`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to connect calendar');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Connect calendar error:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to connect calendar' };
+  }
+};
+
+export const disconnectCalendar = async (): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE}/calendar_app/disconnect`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to disconnect calendar');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Disconnect calendar error:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to disconnect calendar' };
+  }
+};
+
+export const createCalendarEvent = async (eventData: {
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+}): Promise<{ success: boolean; eventId?: string; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE}/calendar_app/add-event`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(eventData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create calendar event');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Create calendar event error:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to create event' };
   }
 };
 
@@ -279,7 +459,6 @@ export async function uploadFile(formData: FormData): Promise<QuizResponse> {
       method: "POST",
       body: formData,
     });
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
@@ -321,7 +500,6 @@ export async function checkAnswer(data: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
@@ -353,7 +531,6 @@ export async function saveQuizResult(result: QuizResult): Promise<{
       headers: getAuthHeaders(),
       body: JSON.stringify(result),
     });
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
@@ -381,7 +558,6 @@ export async function saveQuizResultWithAnswers(payload: SaveQuizResultWithAnswe
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
@@ -406,7 +582,6 @@ export const getQuizHistory = async (): Promise<{ success: boolean; data: QuizAt
         'Authorization': `Bearer ${getAuthToken()}`,
       },
     });
-
     if (!response.ok) {
       throw new Error('Failed to get quiz history');
     }
@@ -431,7 +606,6 @@ export const getQuizStats = async (): Promise<{ success: boolean; data: QuizStat
         'Authorization': `Bearer ${getAuthToken()}`,
       },
     });
-
     if (!response.ok) {
       throw new Error('Failed to get quiz stats');
     }
@@ -461,7 +635,6 @@ export async function getUserQuizStats(username: string): Promise<{
 }> {
   try {
     const response = await fetch(`${API_BASE}/quiz/user-stats/${username}`);
-
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
@@ -481,7 +654,6 @@ export async function getUserQuizStats(username: string): Promise<{
 export const getLeaderboard = async (): Promise<{ success: boolean; leaderboard: any[]; error?: string }> => {
   try {
     const response = await fetch(`${API_BASE}/quiz/leaderboard`);
-
     if (!response.ok) {
       throw new Error('Failed to get leaderboard');
     }
@@ -519,7 +691,6 @@ export const sendChatMessage = async (
         fileText
       }),
     });
-
     if (!response.ok) {
       throw new Error('Failed to send message');
     }
@@ -545,14 +716,12 @@ export const getChatHistory = async (
   try {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (sessionId) params.append('session_id', sessionId.toString());
-
     const response = await fetch(`${API_BASE}/chat/history?${params}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${getAuthToken()}`,
       },
     });
-
     if (!response.ok) {
       throw new Error('Failed to get chat history');
     }
@@ -580,7 +749,6 @@ export const getChatSessions = async (): Promise<{
         'Authorization': `Bearer ${getAuthToken()}`,
       },
     });
-
     if (!response.ok) {
       throw new Error('Failed to get chat sessions');
     }
@@ -607,7 +775,6 @@ export const createChatSession = async (title: string = 'New Chat'): Promise<{
       headers: getAuthHeaders(),
       body: JSON.stringify({ title }),
     });
-
     if (!response.ok) {
       throw new Error('Failed to create chat session');
     }
@@ -633,7 +800,6 @@ export const deleteChatSession = async (sessionId: number): Promise<{
         'Authorization': `Bearer ${getAuthToken()}`,
       },
     });
-
     if (!response.ok) {
       throw new Error('Failed to delete chat session');
     }
@@ -661,7 +827,6 @@ export const renameChatSession = async (
       headers: getAuthHeaders(),
       body: JSON.stringify({ title }),
     });
-
     if (!response.ok) {
       throw new Error('Failed to rename chat session');
     }
@@ -687,7 +852,6 @@ export const uploadChatFile = async (
   try {
     const formData = new FormData();
     formData.append('file', file);
-
     const response = await fetch(`${API_BASE}/chat/upload`, {
       method: 'POST',
       headers: {
@@ -695,7 +859,6 @@ export const uploadChatFile = async (
       },
       body: formData,
     });
-
     if (!response.ok) {
       throw new Error('Failed to upload file');
     }
@@ -712,26 +875,6 @@ export const uploadChatFile = async (
 
 // ===== AI AGENT API =====
 
-export interface PerformanceAnalysis {
-  [topic: string]: {
-    averageScore: number;
-    attempts: number;
-    trend: 'improving' | 'declining' | 'stable';
-    masteryLevel: 'novice' | 'intermediate' | 'proficient' | 'expert';
-    lastAttempted: string;
-    recentScores: number[];
-  };
-}
-
-export interface ScheduledTest {
-  id: number;
-  topic: string;
-  scheduled_date: string;
-  difficulty_level: string;
-  reason: string;
-  status: string;
-}
-
 // Run AI Agent cycle (analyzes performance & schedules tests)
 export const runAIAgentCycle = async (): Promise<{
   success: boolean;
@@ -743,7 +886,6 @@ export const runAIAgentCycle = async (): Promise<{
       method: 'POST',
       headers: getAuthHeaders(),
     });
-
     if (!response.ok) {
       throw new Error('Failed to run AI agent cycle');
     }
@@ -769,7 +911,6 @@ export const getPerformanceAnalysis = async (): Promise<{
       method: 'GET',
       headers: getAuthHeaders(),
     });
-
     if (!response.ok) {
       throw new Error('Failed to get performance analysis');
     }
@@ -795,7 +936,6 @@ export const getScheduledTests = async (): Promise<{
       method: 'GET',
       headers: getAuthHeaders(),
     });
-
     if (!response.ok) {
       throw new Error('Failed to get scheduled tests');
     }
@@ -810,7 +950,6 @@ export const getScheduledTests = async (): Promise<{
     };
   }
 };
-
 
 // ===== HEALTH CHECK =====
 
@@ -832,7 +971,6 @@ export const isAuthenticated = (): boolean => {
 export const getCurrentUserFromToken = (): { id: number; username: string } | null => {
   const token = getAuthToken();
   if (!token) return null;
-
   try {
     // Decode JWT payload (basic decoding - do NOT use for security validation)
     const payloadJson = decodeURIComponent(
