@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { addSession, getSessions, updateSession, deleteSession, getCalendarStatus, connectCalendar } from '../api';
+import { addSession, getSessions, updateSession, deleteSession, getCalendarStatus, connectCalendar } from '../services/api';
 
 interface Session {
   id: number;
