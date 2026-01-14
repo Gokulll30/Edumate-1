@@ -112,6 +112,17 @@ try:
 except Exception as e:
     print(f"❌ AI Agent blueprint registration failed: {e}")
 
+# ========== CODING ASSISTANT INTEGRATION BELOW ==========
+
+try:
+    from coding_assistant.routes import coding_assistant_bp
+    app.register_blueprint(coding_assistant_bp, url_prefix="/coding-assistant")
+    print("✅ Coding Assistant blueprint registered successfully")
+except Exception as e:
+    print(f"❌ Coding Assistant blueprint registration failed: {e}")
+
+# ========== END CODING ASSISTANT INTEGRATION ==========
+
 
 @app.route("/health", methods=["GET"])
 def health():
