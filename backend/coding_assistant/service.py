@@ -1,18 +1,36 @@
+import os
+import google as genai
 from .prompts import build_prompt
 from .language_handlers.python import python_rules
 from .language_handlers.cpp import cpp_rules
 from .language_handlers.javascript import js_rules
-import openai
 
+# ------------------ GEMINI CONFIG ------------------
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+model = genai.GenerativeModel("gemini-pro")
+
+# ------------------ LANGUAGE RULES ------------------
 LANGUAGE_RULES = {
     "python": python_rules,
     "cpp": cpp_rules,
     "javascript": js_rules
 }
 
-def process_code_query(language, question, code, task):
-    rules = LANGUAGE_RULES.get(language.lower())
+# ------------------ SIMPLE RATE LIMIT (5 CALLS) ------------------
+# (Same idea as quiz generator – in-memory, per server run)
+REQUEST_COUNT = 0
+MAX_REQUESTS = 5
 
+def process_code_query(language, question, code, task):
+    global REQUEST_COUNT
+
+    if REQUEST_COUNT >= MAX_REQUESTS:
+        return {
+            "error": "API limit reached. Please try again later."
+        }
+
+    rules = LANGUAGE_RULES.get(language.lower())
     if not rules:
         return {"error": "Unsupported language"}
 
@@ -24,13 +42,17 @@ def process_code_query(language, question, code, task):
         rules=rules
     )
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
+    try:
+        REQUEST_COUNT += 1
 
-    return {
-        "language": language,
-        "answer": response.choices[0].message.content
-    }
+        response = model.generate_content(prompt)
+
+        return {
+            "language": language,
+            "answer": response.text
+        }
+
+    except Exception as e:
+        return {
+            "error": f"Gemini API error: {str(e)}"
+        }
