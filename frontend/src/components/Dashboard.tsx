@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import Navigation from "./Navigation";
-import CodingAssistant from "./CodingAssistant";
 import {
   Clock,
   Target,
@@ -42,9 +41,6 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  const [showCodingAssistant, setShowCodingAssistant] = useState(false);
-
 
   const [selectedTimeframe, setSelectedTimeframe] = useState("week");
   const [progress, setProgress] = useState({
@@ -274,15 +270,6 @@ export default function Dashboard() {
             You have {progress.totalSessions || 0} study sessions scheduled. Let's make it productive!
           </p>
         </div>
-      {/* ✅ Coding Assistant Toggle Button */}
-      <div className="mb-8">
-        <button
-          onClick={() => setShowCodingAssistant(prev => !prev)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
-        >
-          {showCodingAssistant ? "Close Coding Assistant" : "Open Coding Assistant"}
-        </button>
-      </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -411,15 +398,7 @@ export default function Dashboard() {
             })}
           </div>
         </div>
-
-      {/* Coding Assistant render */}
-      {showCodingAssistant && (
-        <div className="mt-8">
-          <CodingAssistant />
-        </div>
-      )}
-
-    </main>
-  </div>
-);
+      </main>
+    </div>
+  );
 }
