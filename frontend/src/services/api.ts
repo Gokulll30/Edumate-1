@@ -986,3 +986,46 @@ export const getCurrentUserFromToken = (): { id: number; username: string } | nu
     return null;
   }
 };
+
+
+// ===== CODING ASSISTANT TYPES =====
+
+export interface CodingAssistantRequest {
+  language: "python" | "cpp" | "javascript";
+  task: "explain" | "debug" | "generate";
+  question: string;
+  code?: string;
+}
+
+export interface CodingAssistantResponse {
+  language?: string;
+  answer?: string;
+  error?: string;
+}
+
+// ===== CODING ASSISTANT API =====
+
+export const askCodingAssistant = async (
+  payload: CodingAssistantRequest
+): Promise<CodingAssistantResponse> => {
+  try {
+    const response = await fetch(`${API_BASE}/coding-assistant/code-assist`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Coding assistant request failed");
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Coding assistant error:", error);
+    return {
+      error: error instanceof Error ? error.message : "Failed to get response",
+    };
+  }
+};
