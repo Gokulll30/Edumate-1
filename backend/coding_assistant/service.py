@@ -1,88 +1,51 @@
 import os
 from google import genai
+from .prompts import build_prompt
+from .language_handlers.python import python_rules
+from .language_handlers.cpp import cpp_rules
+from .language_handlers.javascript import js_rules
 
-# ===============================
-# Gemini Initialization
-# ===============================
-
+# Gemini setup
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY is not set in environment variables")
+    raise RuntimeError("GEMINI_API_KEY not set")
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
+LANGUAGE_RULES = {
+    "python": python_rules,
+    "cpp": cpp_rules,
+    "javascript": js_rules
+}
 
-class CodingAssistantService:
-    """
-    Coding Assistant Service
-    Uses Gemini to explain, debug, or improve code
-    """
 
-    @staticmethod
-    def process_request(language: str, question: str, code: str | None, task: str) -> dict:
-        """
-        Main entry point for Coding Assistant
-        """
+def process_code_query(language: str, question: str, code: str, task: str):
+    rules = LANGUAGE_RULES.get(language.lower())
+    if not rules:
+        return {"error": "Unsupported language"}
 
-        try:
-            prompt = CodingAssistantService._build_prompt(
-                language=language,
-                question=question,
-                code=code,
-                task=task
-            )
+    prompt = build_prompt(
+        language=language,
+        task=task,
+        question=question,
+        code=code,
+        rules=rules
+    )
 
-            response = gemini_client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
 
-            return {
-                "success": True,
-                "answer": response.text.strip()
-            }
+        return {
+            "success": True,
+            "language": language,
+            "answer": response.text
+        }
 
-        except Exception as e:
-            print(f"[Coding Assistant] ❌ Error: {str(e)}")
-            return {
-                "success": False,
-                "error": "Failed to generate response"
-            }
-
-    # ===============================
-    # Prompt Builder
-    # ===============================
-    @staticmethod
-    def _build_prompt(language: str, question: str, code: str | None, task: str) -> str:
-        base_instruction = f"""
-You are an expert programming tutor.
-
-Language: {language}
-Task: {task}
-
-Rules:
-- Be clear and beginner-friendly
-- Explain step-by-step
-- Use examples if helpful
-- Do NOT use markdown formatting
-"""
-
-        if code:
-            return f"""{base_instruction}
-
-User Question:
-{question}
-
-User Code:
-{code}
-
-Explain what the code does, identify issues if any, and suggest improvements.
-"""
-        else:
-            return f"""{base_instruction}
-
-User Question:
-{question}
-
-Provide a clear and structured explanation.
-"""
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
