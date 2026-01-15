@@ -1,58 +1,88 @@
 import os
-import google as genai
-from .prompts import build_prompt
-from .language_handlers.python import python_rules
-from .language_handlers.cpp import cpp_rules
-from .language_handlers.javascript import js_rules
+from google import genai
 
-# ------------------ GEMINI CONFIG ------------------
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# ===============================
+# Gemini Initialization
+# ===============================
 
-model = genai.GenerativeModel("gemini-pro")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not set in environment variables")
 
-# ------------------ LANGUAGE RULES ------------------
-LANGUAGE_RULES = {
-    "python": python_rules,
-    "cpp": cpp_rules,
-    "javascript": js_rules
-}
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
-# ------------------ SIMPLE RATE LIMIT (5 CALLS) ------------------
-# (Same idea as quiz generator – in-memory, per server run)
-REQUEST_COUNT = 0
-MAX_REQUESTS = 5
 
-def process_code_query(language, question, code, task):
-    global REQUEST_COUNT
+class CodingAssistantService:
+    """
+    Coding Assistant Service
+    Uses Gemini to explain, debug, or improve code
+    """
 
-    if REQUEST_COUNT >= MAX_REQUESTS:
-        return {
-            "error": "API limit reached. Please try again later."
-        }
+    @staticmethod
+    def process_request(language: str, question: str, code: str | None, task: str) -> dict:
+        """
+        Main entry point for Coding Assistant
+        """
 
-    rules = LANGUAGE_RULES.get(language.lower())
-    if not rules:
-        return {"error": "Unsupported language"}
+        try:
+            prompt = CodingAssistantService._build_prompt(
+                language=language,
+                question=question,
+                code=code,
+                task=task
+            )
 
-    prompt = build_prompt(
-        language=language,
-        task=task,
-        question=question,
-        code=code,
-        rules=rules
-    )
+            response = gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
 
-    try:
-        REQUEST_COUNT += 1
+            return {
+                "success": True,
+                "answer": response.text.strip()
+            }
 
-        response = model.generate_content(prompt)
+        except Exception as e:
+            print(f"[Coding Assistant] ❌ Error: {str(e)}")
+            return {
+                "success": False,
+                "error": "Failed to generate response"
+            }
 
-        return {
-            "language": language,
-            "answer": response.text
-        }
+    # ===============================
+    # Prompt Builder
+    # ===============================
+    @staticmethod
+    def _build_prompt(language: str, question: str, code: str | None, task: str) -> str:
+        base_instruction = f"""
+You are an expert programming tutor.
 
-    except Exception as e:
-        return {
-            "error": f"Gemini API error: {str(e)}"
-        }
+Language: {language}
+Task: {task}
+
+Rules:
+- Be clear and beginner-friendly
+- Explain step-by-step
+- Use examples if helpful
+- Do NOT use markdown formatting
+"""
+
+        if code:
+            return f"""{base_instruction}
+
+User Question:
+{question}
+
+User Code:
+{code}
+
+Explain what the code does, identify issues if any, and suggest improvements.
+"""
+        else:
+            return f"""{base_instruction}
+
+User Question:
+{question}
+
+Provide a clear and structured explanation.
+"""

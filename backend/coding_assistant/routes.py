@@ -1,17 +1,22 @@
 from flask import Blueprint, request, jsonify
-from .service import process_code_query
+from .service import CodingAssistantService
 
 coding_assistant_bp = Blueprint("coding_assistant", __name__)
 
 @coding_assistant_bp.route("/code-assist", methods=["POST"])
 def code_assist():
-    data = request.json
+    data = request.get_json()
 
-    response = process_code_query(
-        language=data.get("language"),
-        question=data.get("question"),
-        code=data.get("code", ""),
-        task=data.get("task")  # explain | debug | generate
+    language = data.get("language", "python")
+    question = data.get("question", "")
+    code = data.get("code")
+    task = data.get("task", "explain")
+
+    result = CodingAssistantService.process_request(
+        language=language,
+        question=question,
+        code=code,
+        task=task
     )
 
-    return jsonify(response)
+    return jsonify(result)
