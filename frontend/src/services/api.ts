@@ -1005,27 +1005,46 @@ export interface CodingAssistantResponse {
 
 // ===== CODING ASSISTANT API =====
 
-export const askCodingAssistant = async (
-  payload: CodingAssistantRequest
-): Promise<CodingAssistantResponse> => {
+export type CodeRunRequest = {
+  language: "python" | "cpp" | "javascript";
+  code: string;
+  problem_id: string;
+};
+
+export type CodeRunResponse = {
+  success: boolean;
+  passed: boolean;
+  output?: string;
+  test_results?: {
+    input: string;
+    expected: string;
+    actual: string;
+    passed: boolean;
+  }[];
+  error?: string;
+};
+
+export const runCodeAgainstTests = async (
+  payload: CodeRunRequest
+): Promise<CodeRunResponse> => {
   try {
-    const response = await fetch(`${API_BASE}/coding-assistant/code-assist`, {
+    const response = await fetch(`${API_BASE}/coding-assistant/run`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
 
-    const result = await response.json();
-
     if (!response.ok) {
-      throw new Error(result.error || "Coding assistant request failed");
+      throw new Error("Failed to run code");
     }
 
-    return result;
+    return await response.json();
   } catch (error) {
-    console.error("Coding assistant error:", error);
+    console.error("Code run error:", error);
     return {
-      error: error instanceof Error ? error.message : "Failed to get response",
+      success: false,
+      passed: false,
+      error: error instanceof Error ? error.message : "Execution failed",
     };
   }
 };

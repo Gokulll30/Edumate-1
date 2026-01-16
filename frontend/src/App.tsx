@@ -12,7 +12,7 @@ import Navigation from "./components/Navigation";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { QuizProvider } from "./context/QuizContext";
 import { ChatProvider } from "./context/ChatContext";
-import CodingAssistant from "./components/CodingAssistant";
+import CodingAssistantPage from "./components/coding-assistant/CodingAssistantPage";
 
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -96,7 +96,7 @@ function AppContent() {
             path="/coding-assistant"
             element={
               <ProtectedRoute>
-                <CodingAssistant />
+                <CodingAssistantPage />
               </ProtectedRoute>
             }
           />

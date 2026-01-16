@@ -25,7 +25,7 @@ export default function Navigation() {
     { path: '/progress', label: 'Progress', icon: BarChart3 },
     { path: '/quiz', label: 'Quiz Generator', icon: Target },
     { path: '/quiz-performance', label: 'Quiz Performance', icon: TrendingUp }, // Added quiz performance
-    { path: '/coding-assistant', label: 'Coding Assistant', icon: Brain }, // Added coding assistant
+    { path: "/coding-assistant", label: "Coding Assistant", icon: Brain } // Added coding assistant
   ];
 
   const isActive = (path: string) => location.pathname === path;
