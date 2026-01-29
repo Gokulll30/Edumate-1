@@ -1059,3 +1059,24 @@ export const getProblemById = async (id: string) => {
   return res.data;
 };
 
+export const runProblemCode = async ({
+  problemId,
+  code,
+  language
+}: {
+  problemId: string;
+  code: string;
+  language: string;
+}) => {
+  const res = await fetch(
+    `${API_BASE}/coding-assistant/run`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ problemId, code, language })
+    }
+  );
+
+  return res.json();
+};
+
