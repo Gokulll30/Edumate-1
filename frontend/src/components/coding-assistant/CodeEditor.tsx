@@ -1,21 +1,42 @@
-type Props = {
-  mode: "explain" | "debug";
-};
+import { useState } from "react";
+import api from "../../services/api";
 
-export default function CodeEditor({ mode }: Props) {
+export default function CodeEditor({
+  problemId,
+  onRunComplete,
+}: {
+  problemId: string;
+  onRunComplete: (r: any) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [running, setRunning] = useState(false);
+
+  const runCode = async () => {
+    setRunning(true);
+    const res = await api.post("/coding-assistant/run", {
+      problemId,
+      language: "python",
+      code,
+    });
+    onRunComplete(res.data.result);
+    setRunning(false);
+  };
+
   return (
-    <div className="bg-slate-800 p-4 rounded-lg">
+    <div className="mt-6">
       <textarea
-        rows={10}
-        className="w-full bg-black text-green-400 p-4 rounded-lg font-mono"
-        placeholder={
-          mode === "explain"
-            ? "Paste your code to explain..."
-            : "Paste code to debug..."
-        }
+        className="w-full h-48 bg-slate-900 text-white p-4 rounded-lg border border-slate-700"
+        placeholder="Write your Python code here..."
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
       />
-      <button className="mt-4 px-4 py-2 bg-indigo-600 rounded-lg text-white">
-        {mode === "explain" ? "Explain Code" : "Run Tests"}
+
+      <button
+        onClick={runCode}
+        disabled={running}
+        className="mt-4 px-6 py-2 bg-purple-600 rounded-lg hover:bg-purple-700"
+      >
+        {running ? "Running..." : "Run Code"}
       </button>
     </div>
   );

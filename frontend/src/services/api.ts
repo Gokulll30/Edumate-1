@@ -1048,3 +1048,14 @@ export const runCodeAgainstTests = async (
     };
   }
 };
+
+export const getProblems = async () => {
+  const res = await api.get("/coding-assistant/problems");
+  return res.data;
+};
+
+export const getProblemById = async (id: string) => {
+  const res = await api.get(`/coding-assistant/problems/${id}`);
+  return res.data;
+};
+
