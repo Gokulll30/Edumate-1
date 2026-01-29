@@ -1,44 +1,27 @@
 import { useState } from "react";
 import Tabs from "./Tabs";
-import ProblemList from "./ProblemList";
-import CodeEditor from "./CodeEditor";
-import TestResults from "./TestResults";
+import ProblemsTab from "./ProblemsTab";
+import ExplainCodeTab from "./ExplainCodeTab";
+import DebugCodeTab from "./DebugCodeTab";
 
 export default function CodingAssistantPage() {
-  const [activeTab, setActiveTab] = useState<"problems" | "editor" | "results">("problems");
-  const [selectedProblem, setSelectedProblem] = useState<any>(null);
-  const [results, setResults] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("problems");
 
   return (
-    <div className="ml-64 p-8 min-h-screen bg-gray-900 text-white">
-      <h1 className="text-3xl font-bold mb-2">Coding Assistant</h1>
-      <p className="text-gray-400 mb-6">
-        Practice coding problems like LeetCode & HackerRank
+    <div className="max-w-6xl mx-auto">
+      <h1 className="text-3xl font-bold text-white mb-2">
+        Coding Assistant
+      </h1>
+      <p className="text-slate-400 mb-6">
+        Practice problems, explain code, and debug with test cases.
       </p>
 
       <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <div className="mt-6">
-        {activeTab === "problems" && (
-          <ProblemList
-            onSelect={(problem) => {
-              setSelectedProblem(problem);
-              setActiveTab("editor");
-            }}
-          />
-        )}
-
-        {activeTab === "editor" && (
-          <CodeEditor
-            problem={selectedProblem}
-            onRun={(output) => {
-              setResults(output);
-              setActiveTab("results");
-            }}
-          />
-        )}
-
-        {activeTab === "results" && <TestResults results={results} />}
+        {activeTab === "problems" && <ProblemsTab />}
+        {activeTab === "explain" && <ExplainCodeTab />}
+        {activeTab === "debug" && <DebugCodeTab />}
       </div>
     </div>
   );

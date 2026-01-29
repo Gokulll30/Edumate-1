@@ -1,41 +1,21 @@
-import { useState } from "react";
+type Props = {
+  mode: "explain" | "debug";
+};
 
-export default function CodeEditor({ problem, onRun }: any) {
-  const [language, setLanguage] = useState("python");
-  const [code, setCode] = useState("");
-
+export default function CodeEditor({ mode }: Props) {
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">{problem?.title}</h2>
-
-      <select
-        value={language}
-        onChange={(e) => setLanguage(e.target.value)}
-        className="bg-gray-800 p-2 rounded"
-      >
-        <option value="python">Python</option>
-        <option value="cpp">C++</option>
-        <option value="javascript">JavaScript</option>
-      </select>
-
+    <div className="bg-slate-800 p-4 rounded-lg">
       <textarea
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        className="w-full h-64 bg-black text-green-400 p-4 font-mono rounded"
-        placeholder="Write your solution here..."
-      />
-
-      <button
-        onClick={() =>
-          onRun({
-            passed: 2,
-            total: 3,
-            details: ["Test 1 Passed", "Test 2 Passed", "Test 3 Failed"],
-          })
+        rows={10}
+        className="w-full bg-black text-green-400 p-4 rounded-lg font-mono"
+        placeholder={
+          mode === "explain"
+            ? "Paste your code to explain..."
+            : "Paste code to debug..."
         }
-        className="bg-indigo-600 px-6 py-2 rounded hover:bg-indigo-700"
-      >
-        Run Code
+      />
+      <button className="mt-4 px-4 py-2 bg-indigo-600 rounded-lg text-white">
+        {mode === "explain" ? "Explain Code" : "Run Tests"}
       </button>
     </div>
   );

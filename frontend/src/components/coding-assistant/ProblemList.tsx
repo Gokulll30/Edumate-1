@@ -1,32 +1,27 @@
 const problems = [
   { id: 1, title: "Two Sum", difficulty: "Easy" },
   { id: 2, title: "Reverse String", difficulty: "Easy" },
-  { id: 3, title: "Longest Substring", difficulty: "Medium" },
+  { id: 3, title: "Longest Substring Without Repeating Characters", difficulty: "Medium" },
 ];
 
-export default function ProblemList({ onSelect }: any) {
+export default function ProblemList() {
   return (
-    <div className="grid gap-4">
-      {problems.map((p) => (
+    <div className="space-y-3">
+      {problems.map(p => (
         <div
           key={p.id}
-          onClick={() => onSelect(p)}
-          className="cursor-pointer bg-gray-800 p-4 rounded-lg hover:bg-gray-700"
+          className="flex justify-between items-center p-4 bg-slate-800 rounded-lg hover:bg-slate-700 cursor-pointer"
         >
-          <div className="flex justify-between">
-            <h3 className="font-semibold">{p.title}</h3>
-            <span
-              className={`text-sm ${
-                p.difficulty === "Easy"
-                  ? "text-green-400"
-                  : p.difficulty === "Medium"
-                  ? "text-yellow-400"
-                  : "text-red-400"
-              }`}
-            >
-              {p.difficulty}
-            </span>
-          </div>
+          <span className="text-white">{p.title}</span>
+          <span
+            className={`text-sm ${
+              p.difficulty === "Easy"
+                ? "text-green-400"
+                : "text-yellow-400"
+            }`}
+          >
+            {p.difficulty}
+          </span>
         </div>
       ))}
     </div>

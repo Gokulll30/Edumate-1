@@ -1,25 +1,25 @@
 type Props = {
   activeTab: string;
-  setActiveTab: (tab: any) => void;
+  setActiveTab: (tab: string) => void;
 };
 
-export default function Tabs({ activeTab, setActiveTab }: Props) {
-  const tabs = [
-    { id: "problems", label: "Problems" },
-    { id: "editor", label: "Code Editor" },
-    { id: "results", label: "Results" },
-  ];
+const tabs = [
+  { id: "problems", label: "Problems" },
+  { id: "explain", label: "Explain Code" },
+  { id: "debug", label: "Debug Code" },
+];
 
+export default function Tabs({ activeTab, setActiveTab }: Props) {
   return (
-    <div className="flex space-x-4 border-b border-gray-700">
-      {tabs.map((tab) => (
+    <div className="flex space-x-4 border-b border-slate-700">
+      {tabs.map(tab => (
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`pb-2 px-4 font-medium ${
+          className={`pb-3 px-4 font-medium ${
             activeTab === tab.id
-              ? "border-b-2 border-indigo-500 text-indigo-400"
-              : "text-gray-400 hover:text-white"
+              ? "text-indigo-400 border-b-2 border-indigo-400"
+              : "text-slate-400 hover:text-white"
           }`}
         >
           {tab.label}
