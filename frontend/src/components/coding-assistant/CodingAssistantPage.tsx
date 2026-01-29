@@ -1,43 +1,49 @@
 import { useState } from "react";
 import Tabs from "./Tabs";
 import ProblemsTab from "./ProblemsTab";
-import CodeEditor from "./CodeEditor";
-import TestResults from "./TestResults";
 import ExplainCodeTab from "./ExplainCodeTab";
 import DebugCodeTab from "./DebugCodeTab";
 
 export default function CodingAssistantPage() {
   const [activeTab, setActiveTab] = useState("problems");
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
-  const [runResult, setRunResult] = useState<any>(null);
 
   return (
-    <div className="w-full pl-4 pr-6">
-      <h1 className="text-3xl font-bold text-white mb-6">Coding Assistant</h1>
+    // ✅ THIS IS THE FIX — PUSH CONTENT RIGHT OF SIDEBAR
+    <div className="ml-64 p-8 min-h-screen bg-gray-900">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold text-white mb-2">
+          Coding Assistant
+        </h1>
 
-      <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
+        <p className="text-slate-400 mb-6">
+          Practice problems, explain code, and debug with test cases.
+        </p>
 
-      <div className="mt-6">
-        {activeTab === "problems" && (
-          <>
-            {!selectedProblemId && (
-              <ProblemsTab onSelect={(id) => setSelectedProblemId(id)} />
-            )}
+        <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
-            {selectedProblemId && (
-              <>
-                <CodeEditor
-                  problemId={selectedProblemId}
-                  onRunComplete={setRunResult}
-                />
-                {runResult && <TestResults result={runResult} />}
-              </>
-            )}
-          </>
+        <div className="mt-6">
+          {activeTab === "problems" && (
+            <ProblemsTab
+              onSelect={(id) => {
+                console.log("Selected problem:", id);
+                setSelectedProblemId(id);
+              }}
+            />
+          )}
+
+          {activeTab === "explain" && <ExplainCodeTab />}
+          {activeTab === "debug" && <DebugCodeTab />}
+        </div>
+
+        {/* TEMP DEBUG (remove later) */}
+        {selectedProblemId && (
+          <div className="mt-6 p-4 bg-slate-800 border border-slate-700 rounded-lg">
+            <p className="text-green-400">
+              ✅ Selected Problem ID: {selectedProblemId}
+            </p>
+          </div>
         )}
-
-        {activeTab === "explain" && <ExplainCodeTab />}
-        {activeTab === "debug" && <DebugCodeTab />}
       </div>
     </div>
   );
