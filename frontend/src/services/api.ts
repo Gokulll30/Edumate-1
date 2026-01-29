@@ -988,95 +988,109 @@ export const getCurrentUserFromToken = (): { id: number; username: string } | nu
 };
 
 
-// ===== CODING ASSISTANT TYPES =====
-
-export interface CodingAssistantRequest {
-  language: "python" | "cpp" | "javascript";
-  task: "explain" | "debug" | "generate";
-  question: string;
-  code?: string;
-}
-
-export interface CodingAssistantResponse {
-  language?: string;
-  answer?: string;
-  error?: string;
-}
-
 // ===== CODING ASSISTANT API =====
 
-export type CodeRunRequest = {
-  language: "python" | "cpp" | "javascript";
-  code: string;
-  problem_id: string;
+import axios from "axios";
+
+/* -------------------------------------------------
+   Axios instance
+------------------------------------------------- */
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+export default api;
+
+/* -------------------------------------------------
+   TYPES
+------------------------------------------------- */
+export type ProblemSummary = {
+  id: string;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
 };
 
-export type CodeRunResponse = {
+export type ProblemDetail = {
+  id: string;
+  title: string;
+  difficulty: string;
+  description: string;
+  examples?: any[];
+  constraints?: string[];
+  starterCode?: Record<string, string>;
+  testCases?: any[];
+};
+
+export type RunCodeResponse = {
   success: boolean;
-  passed: boolean;
-  output?: string;
-  test_results?: {
-    input: string;
-    expected: string;
-    actual: string;
+  result?: {
     passed: boolean;
-  }[];
+    testResults: {
+      input: string;
+      expected: string;
+      actual: string;
+      passed: boolean;
+    }[];
+  };
   error?: string;
 };
 
-export const runCodeAgainstTests = async (
-  payload: CodeRunRequest
-): Promise<CodeRunResponse> => {
-  try {
-    const response = await fetch(`${API_BASE}/coding-assistant/run`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(payload),
-    });
+/* -------------------------------------------------
+   PROBLEMS API (LeetCode-style)
+------------------------------------------------- */
 
-    if (!response.ok) {
-      throw new Error("Failed to run code");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Code run error:", error);
-    return {
-      success: false,
-      passed: false,
-      error: error instanceof Error ? error.message : "Execution failed",
-    };
-  }
-};
-
-export const getProblems = async () => {
+// ✅ Get list of problems
+export async function getProblems(): Promise<{
+  success: boolean;
+  problems: ProblemSummary[];
+}> {
   const res = await api.get("/coding-assistant/problems");
   return res.data;
-};
+}
 
-export const getProblemById = async (id: string) => {
+// ✅ Get single problem by ID
+export async function getProblemById(
+  id: string
+): Promise<{
+  success: boolean;
+  problem: ProblemDetail;
+}> {
   const res = await api.get(`/coding-assistant/problems/${id}`);
   return res.data;
-};
+}
 
-export const runProblemCode = async ({
+/* -------------------------------------------------
+   RUN USER CODE AGAINST TEST CASES
+------------------------------------------------- */
+
+// ✅ ONE canonical run API
+export async function runProblemCode({
   problemId,
   code,
-  language
+  language,
 }: {
   problemId: string;
   code: string;
-  language: string;
-}) => {
-  const res = await fetch(
-    `${API_BASE}/coding-assistant/run`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ problemId, code, language })
-    }
-  );
+  language: "python" | "cpp" | "javascript";
+}): Promise<RunCodeResponse> {
+  try {
+    const res = await api.post("/coding-assistant/run", {
+      problemId,
+      code,
+      language,
+    });
 
-  return res.json();
-};
+    return res.data;
+  } catch (err: any) {
+    console.error("Run code failed:", err);
+    return {
+      success: false,
+      error: err?.response?.data?.error || "Execution failed",
+    };
+  }
+}
 
