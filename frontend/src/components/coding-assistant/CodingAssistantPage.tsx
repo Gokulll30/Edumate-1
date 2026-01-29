@@ -12,7 +12,7 @@ export default function CodingAssistantPage() {
   const [runResult, setRunResult] = useState<any>(null);
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full pl-4 pr-6">
       <h1 className="text-3xl font-bold text-white mb-6">Coding Assistant</h1>
 
       <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
