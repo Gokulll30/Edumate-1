@@ -10,10 +10,12 @@ export default function CodingAssistantPage() {
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
 
   return (
-    <div className="max-w-7xl mx-auto px-6">
+    // ✅ FIX: offset content to the right of sidebar
+    <div className="ml-64 max-w-7xl mx-auto px-6">
       <h1 className="text-3xl font-bold text-white mb-2">
         Coding Assistant
       </h1>
+
       <p className="text-slate-400 mb-6">
         Practice problems, explain code, and debug with test cases.
       </p>
