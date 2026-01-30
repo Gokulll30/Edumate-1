@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getProblemById } from "../../services/api";
-import MonacoCodeEditor from "./MonacoCodeEditor";
+import CodeEditor from "./CodeEditor";
+import TestResults from "./TestResults";
 
 export default function ProblemSolveView({
   problemId,
@@ -10,12 +11,14 @@ export default function ProblemSolveView({
   onBack: () => void;
 }) {
   const [problem, setProblem] = useState<any>(null);
-  const [language, setLanguage] = useState<"python" | "cpp" | "javascript">("python");
+  const [result, setResult] = useState<any>(null);
 
   useEffect(() => {
     async function loadProblem() {
       const res = await getProblemById(problemId);
-      if (res.success) setProblem(res.problem);
+      if (res.success) {
+        setProblem(res.problem);
+      }
     }
     loadProblem();
   }, [problemId]);
@@ -29,36 +32,22 @@ export default function ProblemSolveView({
       {/* Back Button */}
       <button
         onClick={onBack}
-        className="flex items-center gap-2 text-slate-300 hover:text-white"
+        className="flex items-center gap-2 text-purple-400 hover:text-purple-300"
       >
         ← Back to Problems
       </button>
 
-      {/* Problem Title */}
-      <h2 className="text-2xl font-bold text-white">
-        {problem.title}
-      </h2>
-
-      {/* Description */}
-      <p className="text-slate-300">{problem.description}</p>
-
-      {/* Language Selector */}
-      <select
-        value={language}
-        onChange={(e) => setLanguage(e.target.value as any)}
-        className="bg-slate-800 border border-slate-700 px-3 py-2 rounded text-white"
-      >
-        <option value="python">Python</option>
-        <option value="cpp">C++</option>
-        <option value="javascript">JavaScript</option>
-      </select>
+      {/* Problem Info */}
+      <div>
+        <h2 className="text-2xl font-bold text-white">{problem.title}</h2>
+        <p className="text-slate-400 mt-2">{problem.description}</p>
+      </div>
 
       {/* Code Editor */}
-      <MonacoCodeEditor
-        language={language}
-        initialCode={problem.starterCode?.[language] || ""}
-        problemId={problem.id}
-      />
+      <CodeEditor problem={problem} onRunResult={setResult} />
+
+      {/* Test Results */}
+      {result && <TestResults result={result} />}
     </div>
   );
 }
