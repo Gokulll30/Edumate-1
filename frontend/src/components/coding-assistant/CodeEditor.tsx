@@ -1,55 +1,53 @@
 import { useState } from "react";
 import { runProblemCode } from "../../services/api";
-import TestResults from "./TestResults";
 
-type Props = {
-  problemId: string;
-  starterCode: string;
-};
+export default function CodeEditor({
+  problem,
+  onRunResult
+}: {
+  problem: any;
+  onRunResult: (res: any) => void;
+}) {
+  const [language, setLanguage] = useState<"python" | "cpp" | "javascript">("python");
+  const [code, setCode] = useState(problem.starterCode?.python || "");
 
-export default function CodeEditor({ problemId, starterCode }: Props) {
-  const [code, setCode] = useState(starterCode);
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any>(null);
-
-  const handleRun = async () => {
-    try {
-      setLoading(true);
-      setResults(null);
-
-      const response = await runProblemCode({
-        problemId,
-        language: "python",
-        code
-      });
-
-      setResults(response.result);
-    } catch (err) {
-      setResults({
-        error: "Execution failed. Check backend."
-      });
-    } finally {
-      setLoading(false);
-    }
+  const run = async () => {
+    const res = await runProblemCode({
+      problemId: problem.id,
+      language,
+      code
+    });
+    onRunResult(res);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
+      <select
+        value={language}
+        onChange={e => {
+          const lang = e.target.value as any;
+          setLanguage(lang);
+          setCode(problem.starterCode?.[lang] || "");
+        }}
+        className="bg-slate-800 text-white p-2 rounded"
+      >
+        <option value="python">Python</option>
+        <option value="cpp">C++</option>
+        <option value="javascript">JavaScript</option>
+      </select>
+
       <textarea
-        className="w-full h-64 p-4 bg-slate-900 text-white rounded-lg font-mono border border-slate-700 focus:outline-none focus:border-purple-500"
+        className="w-full h-48 bg-slate-900 text-white p-3 rounded font-mono"
         value={code}
-        onChange={(e) => setCode(e.target.value)}
+        onChange={e => setCode(e.target.value)}
       />
 
       <button
-        onClick={handleRun}
-        disabled={loading}
-        className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium disabled:opacity-50"
+        onClick={run}
+        className="px-4 py-2 bg-purple-600 rounded text-white"
       >
-        {loading ? "Running..." : "Run Code"}
+        Run Code
       </button>
-
-      {results && <TestResults results={results} />}
     </div>
   );
 }

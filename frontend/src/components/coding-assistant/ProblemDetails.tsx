@@ -1,66 +1,31 @@
 import { useEffect, useState } from "react";
-import { getProblemById } from "../../services/api";
+import { getProblemById, ProblemDetail } from "../../services/api";
+import CodeEditor from "./CodeEditor";
+import TestResults from "./TestResults";
 
-type Props = {
-  problemId: string;
-};
-
-export default function ProblemDetails({ problemId }: Props) {
-  const [problem, setProblem] = useState<any>(null);
+export default function ProblemDetails({ problemId }: { problemId: string }) {
+  const [problem, setProblem] = useState<ProblemDetail | null>(null);
+  const [result, setResult] = useState<any>(null);
 
   useEffect(() => {
-    async function fetchProblem() {
-      const data = await getProblemById(problemId);
-      setProblem(data);
-    }
-    fetchProblem();
+    getProblemById(problemId).then(res => {
+      if (res.success) setProblem(res.problem);
+    });
   }, [problemId]);
 
-  if (!problem) {
-    return <div className="text-slate-400">Loading problem...</div>;
-  }
+  if (!problem) return <p className="text-slate-400">Loading...</p>;
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-white">
-        {problem.title}
-      </h2>
+      <h2 className="text-xl font-bold text-white">{problem.title}</h2>
+      <p className="text-slate-300">{problem.description}</p>
 
-      <span className={`inline-block px-3 py-1 rounded-full text-sm ${
-        problem.difficulty === "Easy"
-          ? "bg-green-500/20 text-green-400"
-          : problem.difficulty === "Medium"
-          ? "bg-yellow-500/20 text-yellow-400"
-          : "bg-red-500/20 text-red-400"
-      }`}>
-        {problem.difficulty}
-      </span>
+      <CodeEditor
+        problem={problem}
+        onRunResult={setResult}
+      />
 
-      <p className="text-slate-300 whitespace-pre-line">
-        {problem.description}
-      </p>
-
-      <div>
-        <h3 className="font-semibold text-white">Examples</h3>
-        {problem.examples.map((ex: any, idx: number) => (
-          <pre
-            key={idx}
-            className="bg-slate-800 p-3 rounded mt-2 text-slate-200"
-          >
-Input: {ex.input}
-Output: {ex.output}
-          </pre>
-        ))}
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-white">Constraints</h3>
-        <ul className="list-disc ml-5 text-slate-300">
-          {problem.constraints.map((c: string, idx: number) => (
-            <li key={idx}>{c}</li>
-          ))}
-        </ul>
-      </div>
+      {result && <TestResults result={result} />}
     </div>
   );
 }

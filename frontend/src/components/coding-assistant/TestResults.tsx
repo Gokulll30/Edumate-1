@@ -1,16 +1,26 @@
 export default function TestResults({ result }: { result: any }) {
-  return (
-    <div className="mt-6 bg-slate-800 border border-slate-700 rounded-lg p-4">
-      <h3 className="text-lg font-semibold text-white mb-3">Test Results</h3>
+  if (!result.success) {
+    return <p className="text-red-400">{result.error}</p>;
+  }
 
-      {result.testResults.map((t: any, i: number) => (
+  return (
+    <div className="mt-4 space-y-2">
+      {result.result.testResults.map((t: any, i: number) => (
         <div
           key={i}
-          className={`p-3 rounded mb-2 ${
-            t.passed ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+          className={`p-2 rounded ${
+            t.passed ? "bg-green-500/20" : "bg-red-500/20"
           }`}
         >
-          Test Case {i + 1}: {t.passed ? "Passed" : "Failed"}
+          <p className="text-sm text-white">
+            Input: {JSON.stringify(t.input)}
+          </p>
+          <p className="text-sm text-slate-300">
+            Expected: {JSON.stringify(t.expected)}
+          </p>
+          <p className="text-sm text-slate-300">
+            Got: {JSON.stringify(t.actual)}
+          </p>
         </div>
       ))}
     </div>

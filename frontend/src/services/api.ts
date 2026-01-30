@@ -987,27 +987,19 @@ export const getCurrentUserFromToken = (): { id: number; username: string } | nu
   }
 };
 
-
 // ===== CODING ASSISTANT API =====
 
-import axios from "axios";
+/* =====================================================
+   BASE CONFIG
+===================================================== */
 
-/* -------------------------------------------------
-   Axios instance
-------------------------------------------------- */
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
 
-export default api;
-
-/* -------------------------------------------------
+/* =====================================================
    TYPES
-------------------------------------------------- */
+===================================================== */
+
 export type ProblemSummary = {
   id: string;
   title: string;
@@ -1030,44 +1022,60 @@ export type RunCodeResponse = {
   result?: {
     passed: boolean;
     testResults: {
-      input: string;
-      expected: string;
-      actual: string;
+      input: any;
+      expected: any;
+      actual: any;
       passed: boolean;
     }[];
   };
   error?: string;
 };
 
-/* -------------------------------------------------
+/* =====================================================
    PROBLEMS API (LeetCode-style)
-------------------------------------------------- */
+===================================================== */
 
-// ✅ Get list of problems
+// ✅ Get all problems
 export async function getProblems(): Promise<{
   success: boolean;
   problems: ProblemSummary[];
 }> {
-  const res = await api.get("/coding-assistant/problems");
-  return res.data;
+  const res = await fetch(`${API_BASE}/coding-assistant/problems`, {
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch problems");
+  }
+
+  return res.json();
 }
 
-// ✅ Get single problem by ID
+// ✅ Get problem by ID
 export async function getProblemById(
   id: string
 ): Promise<{
   success: boolean;
   problem: ProblemDetail;
 }> {
-  const res = await api.get(`/coding-assistant/problems/${id}`);
-  return res.data;
+  const res = await fetch(
+    `${API_BASE}/coding-assistant/problems/${id}`,
+    {
+      credentials: "include",
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch problem");
+  }
+
+  return res.json();
 }
 
-/* -------------------------------------------------
+/* =====================================================
    RUN USER CODE AGAINST TEST CASES
-------------------------------------------------- */
+===================================================== */
 
-// ✅ ONE canonical run API
 export async function runProblemCode({
   problemId,
   code,
@@ -1077,20 +1085,26 @@ export async function runProblemCode({
   code: string;
   language: "python" | "cpp" | "javascript";
 }): Promise<RunCodeResponse> {
-  try {
-    const res = await api.post("/coding-assistant/run", {
+  const res = await fetch(`${API_BASE}/coding-assistant/run`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({
       problemId,
       code,
       language,
-    });
+    }),
+  });
 
-    return res.data;
-  } catch (err: any) {
-    console.error("Run code failed:", err);
+  if (!res.ok) {
+    const errText = await res.text();
     return {
       success: false,
-      error: err?.response?.data?.error || "Execution failed",
+      error: errText || "Execution failed",
     };
   }
-}
 
+  return res.json();
+}
