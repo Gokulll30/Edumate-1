@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { getProblemById } from "../../services/api";
 import CodeEditor from "./CodeEditor";
-import TestResults from "./TestResults";
+import ResultSummary from "./ResultSummary";
+import TestCases from "./TestCases";
+import ExamplesSection from "./ExamplesSection";
 
 export default function ProblemSolveView({
   problemId,
@@ -15,9 +17,13 @@ export default function ProblemSolveView({
 
   useEffect(() => {
     async function loadProblem() {
-      const res = await getProblemById(problemId);
-      if (res.success) {
-        setProblem(res.problem);
+      try {
+        const res = await getProblemById(problemId);
+        if (res.success) {
+          setProblem(res.problem);
+        }
+      } catch (err) {
+        console.error("Failed to load problem", err);
       }
     }
     loadProblem();
@@ -39,15 +45,28 @@ export default function ProblemSolveView({
 
       {/* Problem Info */}
       <div>
-        <h2 className="text-2xl font-bold text-white">{problem.title}</h2>
-        <p className="text-slate-400 mt-2">{problem.description}</p>
+        <h2 className="text-2xl font-bold text-white">
+          {problem.title}
+        </h2>
+        <p className="text-slate-400 mt-2">
+          {problem.description}
+        </p>
       </div>
 
-      {/* Code Editor */}
-      <CodeEditor problem={problem} onRunResult={setResult} />
+      {/* Examples (NEW – LeetCode style) */}
+      <ExamplesSection examples={problem.examples} />
 
-      {/* Test Results */}
-      {result && <TestResults result={result} />}
+      {/* Test Cases (INPUTS ONLY) */}
+      <TestCases testCases={problem.testCases} />
+
+      {/* Code Editor */}
+      <CodeEditor
+        problem={problem}
+        onRunResult={setResult}
+      />
+
+      {/* Execution / Test Results */}
+      {result && <ResultSummary result={result} />}
     </div>
   );
 }
