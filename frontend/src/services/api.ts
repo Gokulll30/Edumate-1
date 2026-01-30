@@ -987,18 +987,9 @@ export const getCurrentUserFromToken = (): { id: number; username: string } | nu
   }
 };
 
-// ===== CODING ASSISTANT API =====
-
-/* =====================================================
-   BASE CONFIG
-===================================================== */
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
-
-/* =====================================================
-   TYPES
-===================================================== */
+// =====================================================
+// CODING ASSISTANT API (LeetCode-style)
+// =====================================================
 
 export type ProblemSummary = {
   id: string;
@@ -1031,51 +1022,25 @@ export type RunCodeResponse = {
   error?: string;
 };
 
-/* =====================================================
-   PROBLEMS API (LeetCode-style)
-===================================================== */
-
 // ✅ Get all problems
 export async function getProblems(): Promise<{
   success: boolean;
   problems: ProblemSummary[];
 }> {
-  const res = await fetch(`${API_BASE}/coding-assistant/problems`, {
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch problems");
-  }
-
+  const res = await fetch(`${API_BASE}/coding-assistant/problems`);
   return res.json();
 }
 
 // ✅ Get problem by ID
-export async function getProblemById(
-  id: string
-): Promise<{
+export async function getProblemById(id: string): Promise<{
   success: boolean;
   problem: ProblemDetail;
 }> {
-  const res = await fetch(
-    `${API_BASE}/coding-assistant/problems/${id}`,
-    {
-      credentials: "include",
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch problem");
-  }
-
+  const res = await fetch(`${API_BASE}/coding-assistant/problems/${id}`);
   return res.json();
 }
 
-/* =====================================================
-   RUN USER CODE AGAINST TEST CASES
-===================================================== */
-
+// ✅ Run code against test cases
 export async function runProblemCode({
   problemId,
   code,
@@ -1090,21 +1055,8 @@ export async function runProblemCode({
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "include",
-    body: JSON.stringify({
-      problemId,
-      code,
-      language,
-    }),
+    body: JSON.stringify({ problemId, code, language }),
   });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    return {
-      success: false,
-      error: errText || "Execution failed",
-    };
-  }
 
   return res.json();
 }
