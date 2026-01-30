@@ -47,7 +47,9 @@ export default function QuizPerformance() {
   const [loading, setLoading] = useState(true);
   const [loadingAgent, setLoadingAgent] = useState(false);
   const [agentMessage, setAgentMessage] = useState('');
-
+  // 🔹 AI button states
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiStatusMsg, setAiStatusMsg] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPerformanceData();
@@ -116,7 +118,7 @@ export default function QuizPerformance() {
 
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div  style={{padding: '20px', maxWidth: '1400px', marginLeft: '256px', marginRight: 'auto'  }}>
       <h1 style={{ color: '#9c7cff', marginBottom: '30px', fontSize: '2rem' }}>
         🎯 Quiz Performance
       </h1>
