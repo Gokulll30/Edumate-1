@@ -1011,3 +1011,77 @@ export const getCurrentUserFromToken = (): { id: number; username: string } | nu
     return null;
   }
 };
+
+// =====================================================
+// CODING ASSISTANT API (LeetCode-style)
+// =====================================================
+
+export type ProblemSummary = {
+  id: string;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+};
+
+export type ProblemDetail = {
+  id: string;
+  title: string;
+  difficulty: string;
+  description: string;
+  examples?: any[];
+  constraints?: string[];
+  starterCode?: Record<string, string>;
+  testCases?: any[];
+};
+
+export type RunCodeResponse = {
+  success: boolean;
+  result?: {
+    passed: boolean;
+    testResults: {
+      input: any;
+      expected: any;
+      actual: any;
+      passed: boolean;
+    }[];
+  };
+  error?: string;
+};
+
+// ✅ Get all problems
+export async function getProblems(): Promise<{
+  success: boolean;
+  problems: ProblemSummary[];
+}> {
+  const res = await fetch(`${API_BASE}/coding-assistant/problems`);
+  return res.json();
+}
+
+// ✅ Get problem by ID
+export async function getProblemById(id: string): Promise<{
+  success: boolean;
+  problem: ProblemDetail;
+}> {
+  const res = await fetch(`${API_BASE}/coding-assistant/problems/${id}`);
+  return res.json();
+}
+
+// ✅ Run code against test cases
+export async function runProblemCode({
+  problemId,
+  code,
+  language,
+}: {
+  problemId: string;
+  code: string;
+  language: "python" | "cpp" | "javascript";
+}): Promise<RunCodeResponse> {
+  const res = await fetch(`${API_BASE}/coding-assistant/run`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ problemId, code, language }),
+  });
+
+  return res.json();
+}
