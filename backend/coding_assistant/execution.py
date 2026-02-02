@@ -1,53 +1,87 @@
 import traceback
 
-def run_python_code(user_code, function_name, test_cases):
-    results = []
+def run_python_code(user_code: str, function_name: str, test_cases: list):
+    """
+    Safely executes user code against test cases.
+    Returns detailed pass/fail results per test.
+    """
 
-    local_env = {}
+    results = []
+    all_passed = True
+
+    # Execution environment
+    exec_globals = {}
+    exec_locals = {}
 
     try:
-        # 1️⃣ Execute user code safely
-        exec(user_code, {}, local_env)
-
-        # 2️⃣ Ensure function exists
-        if function_name not in local_env:
-            return {
-                "passed": False,
-                "testResults": [],
-                "error": f"Function '{function_name}' is not defined. Please define it exactly as required."
-            }
-
-        func = local_env[function_name]
-
-        # 3️⃣ Run test cases
-        for tc in test_cases:
-            try:
-                output = func(**tc["input"])
-                passed = output == tc["output"]
-
-                results.append({
-                    "input": tc["input"],
-                    "expected": tc["output"],
-                    "actual": output,
-                    "passed": passed
-                })
-
-            except Exception as e:
-                results.append({
-                    "input": tc["input"],
-                    "expected": tc["output"],
-                    "actual": str(e),
-                    "passed": False
-                })
-
-        return {
-            "passed": all(r["passed"] for r in results),
-            "testResults": results
-        }
-
+        # Compile + load user code
+        exec(user_code, exec_globals, exec_locals)
     except Exception as e:
+        # Syntax / definition error
         return {
             "passed": False,
-            "testResults": [],
-            "error": str(e)
+            "testResults": [
+                {
+                    "input": None,
+                    "expected": None,
+                    "actual": None,
+                    "passed": False,
+                    "error": f"Code execution failed:\n{traceback.format_exc()}"
+                }
+            ]
         }
+
+    # Function existence check
+    if function_name not in exec_locals:
+        return {
+            "passed": False,
+            "testResults": [
+                {
+                    "input": None,
+                    "expected": None,
+                    "actual": None,
+                    "passed": False,
+                    "error": f"Function '{function_name}' is not defined."
+                }
+            ]
+        }
+
+    func = exec_locals[function_name]
+
+    # Run each test case
+    for tc in test_cases:
+        try:
+            inputs = tc["input"]
+            expected = tc["output"]
+
+            # Support dict-style inputs
+            if isinstance(inputs, dict):
+                actual = func(**inputs)
+            else:
+                actual = func(inputs)
+
+            passed = actual == expected
+            if not passed:
+                all_passed = False
+
+            results.append({
+                "input": inputs,
+                "expected": expected,
+                "actual": actual,
+                "passed": passed
+            })
+
+        except Exception as e:
+            all_passed = False
+            results.append({
+                "input": tc.get("input"),
+                "expected": tc.get("output"),
+                "actual": None,
+                "passed": False,
+                "error": traceback.format_exc()
+            })
+
+    return {
+        "passed": all_passed,
+        "testResults": results
+    }

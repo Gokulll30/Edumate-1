@@ -4,7 +4,7 @@
     "title": "Two Sum",
     "difficulty": "Easy",
     "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-    "functionName": "twoSum",
+    "function_name": "twoSum",
 
     "examples": [
       {
@@ -23,14 +23,14 @@
       "javascript": "var twoSum = function(nums, target) {\n\n};"
     },
 
-    "testCases": [
+    "test_cases": [
       {
         "input": { "nums": [2, 7, 11, 15], "target": 9 },
-        "expected": [0, 1]
+        "output": [0, 1]
       },
       {
         "input": { "nums": [3, 2, 4], "target": 6 },
-        "expected": [1, 2]
+        "output": [1, 2]
       }
     ]
   },
@@ -40,7 +40,7 @@
     "title": "Reverse String",
     "difficulty": "Easy",
     "description": "Write a function that reverses a string.",
-    "functionName": "reverseString",
+    "function_name": "reverseString",
 
     "examples": [
       {
@@ -53,10 +53,10 @@
       "python": "def reverseString(s):\n    pass"
     },
 
-    "testCases": [
+    "test_cases": [
       {
         "input": { "s": "hello" },
-        "expected": "olleh"
+        "output": "olleh"
       }
     ]
   }
