@@ -1,5 +1,7 @@
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response, stream_with_context
+import os
+import requests
 from db import (
     get_db_connection,
     get_chat_history,
@@ -10,9 +12,11 @@ from db import (
     create_chat_session,
     delete_chat_session,
     rename_chat_session,
+    save_chat_message,
 )
 from auth.routes import decode_auth_token
-from chat.service import get_chat_response  # absolute import
+from chat.service import get_chat_response
+from chat.service import get_groq_response
 
 
 # Define blueprint without url_prefix — the prefix is applied when registering in app.py
@@ -62,6 +66,123 @@ def chat():
     bot_reply = get_chat_response(combined_message, user_id, session_id)
 
     return jsonify({"reply": bot_reply, "success": True, "session_id": session_id})
+
+
+@chat_bp.route("/stream", methods=["POST"])
+def chat_stream():
+    """Streaming endpoint: returns Server-Sent-Event style chunks of the reply.
+    This simulates streaming for clients that want incremental updates.
+    """
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    data = request.get_json() or {}
+    user = None
+    if token:
+        user_data = decode_auth_token(token)
+        if user_data and "username" in user_data:
+            user = get_user_by_username(user_data["username"])
+
+    user_id = user["id"] if user else None
+
+    user_message = data.get("message", "")
+    session_id = data.get("session_id")
+    try:
+        session_id = int(session_id) if session_id is not None else None
+    except Exception:
+        session_id = None
+    file_text = data.get("fileText", "")
+
+    combined_message = user_message
+    if file_text:
+        combined_message = f"{user_message}\n\nContext from uploaded file:\n{file_text}"
+
+    # ensure session
+    if session_id is None:
+        try:
+            session_id = create_chat_session(user_id, "New Chat")
+        except Exception as e:
+            print("Warning: failed to create chat session:", e)
+
+    # Save user message (non-blocking for stream)
+    try:
+        save_chat_message(user_id, "user", combined_message, session_id)
+    except Exception as e:
+        print("Warning: failed to save user message (stream):", e)
+
+    def generate():
+        # Generate full reply (optimized by service)
+        bot_reply = ""
+        try:
+            bot_reply = get_groq_response(combined_message)
+        except Exception as e:
+            bot_reply = f"Error: {str(e)}"
+
+        # Stream out the reply in small chunks to simulate real-time typing
+        try:
+            chunk_size = 40
+            for i in range(0, len(bot_reply), chunk_size):
+                chunk = bot_reply[i : i + chunk_size]
+                # SSE-style minimal framing
+                yield f"data: {chunk}\n\n"
+                import time
+
+                time.sleep(0.04)
+        finally:
+            # After streaming completes, save bot reply to DB
+            try:
+                save_chat_message(user_id, "bot", bot_reply, session_id)
+            except Exception as e:
+                print("Warning: failed to save bot message (stream):", e)
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+@chat_bp.route("/youtube/search", methods=["POST"])
+def youtube_search():
+    """Search YouTube for a query using server-side API key and return top results.
+    Expects JSON body: { query: string, maxResults?: number }
+    """
+    data = request.get_json() or {}
+    query = data.get("query")
+    max_results = int(data.get("maxResults", 2))
+    if not query:
+        return jsonify({"success": False, "error": "No query provided"}), 400
+
+    api_key = os.getenv("YOUTUBE_API_KEY")
+    if not api_key:
+        return jsonify({"success": False, "error": "YOUTUBE_API_KEY not configured on server"}), 500
+
+    url = "https://www.googleapis.com/youtube/v3/search"
+    params = {
+        "part": "snippet",
+        "q": query,
+        "type": "video",
+        "maxResults": max_results,
+        "key": api_key,
+    }
+
+    try:
+        resp = requests.get(url, params=params, timeout=8)
+        if resp.status_code != 200:
+            return jsonify({"success": False, "error": "YouTube API error", "details": resp.text}), resp.status_code
+        body = resp.json()
+        videos = []
+        for item in body.get("items", []):
+            vid = item.get("id", {}).get("videoId")
+            snip = item.get("snippet", {})
+            if not vid:
+                continue
+            videos.append({
+                "videoId": vid,
+                "title": snip.get("title"),
+                "description": snip.get("description"),
+                "channelTitle": snip.get("channelTitle"),
+                "thumbnail": (snip.get("thumbnails") or {}).get("high", {}).get("url") or (snip.get("thumbnails") or {}).get("default", {}).get("url"),
+                "publishTime": snip.get("publishTime"),
+            })
+
+        return jsonify({"success": True, "videos": videos})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @chat_bp.route("/history", methods=["GET"])
 def chat_history():

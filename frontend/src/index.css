@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ensure the app background is always dark to avoid white gaps */
+html, body, #root {
+  background-color: #0f172a; /* matches Tailwind gray-900 */
+  min-height: 100%;
+}
+
 /* Custom scrollbar styles */
 ::-webkit-scrollbar {
   width: 6px;

@@ -270,6 +270,7 @@ export default function Dashboard() {
             You have {progress.totalSessions || 0} study sessions scheduled. Let's make it productive!
           </p>
         </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => {

@@ -5,7 +5,8 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from db import get_db_connection
 import mysql.connector.errors
-
+# ✅ ADD THIS IMPORT
+from jobs.cron_jobs import start_agent_cron_job
 # Load env variables from .env in parent folder
 APP_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(APP_DIR, "..", ".env"))
@@ -102,6 +103,26 @@ except Exception as e:
     print(f"❌ Calendar blueprint registration failed: {e}")
 
 # ========== END CALENDAR INTEGRATION ADDITIONS ==========
+# Add after calendar_bp registration in app.py
+
+try:
+    from ai_agent.routes import ai_agent_bp
+    app.register_blueprint(ai_agent_bp, url_prefix="/ai-agent")
+    print("✅ AI Agent blueprint registered successfully")
+except Exception as e:
+    print(f"❌ AI Agent blueprint registration failed: {e}")
+
+# ========== CODING ASSISTANT INTEGRATION BELOW ==========
+
+try:
+    from coding_assistant.routes import coding_assistant_bp
+    app.register_blueprint(coding_assistant_bp, url_prefix="/coding-assistant")
+    print("✅ Coding Assistant blueprint registered successfully")
+except Exception as e:
+    print(f"❌ Coding Assistant blueprint registration failed: {e}")
+
+# ========== END CODING ASSISTANT INTEGRATION ==========
+
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -146,7 +167,13 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("🚀 EDUMATE BACKEND STARTING")
     print("=" * 60)
-    print("\n📋 Registered Routes:")
+    # ✅ START CRON JOBS ON SERVER BOOT
+    '''try:
+        start_agent_cron_job()
+        print("✅ AI Agent cron job started")
+    except Exception as e:
+        print(f"❌ Failed to start cron jobs: {e}")
+    print("\n📋 Registered Routes:")'''
     for rule in app.url_map.iter_rules():
         methods = ",".join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
         print(f" {rule.rule:<40} [{methods}]")

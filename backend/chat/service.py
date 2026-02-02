@@ -12,33 +12,53 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # In-memory chat history
 chat_history = []
 
+# Configuration: keep only this many recent entries (user + assistant messages count as entries)
+MAX_HISTORY_ENTRIES = 12
+# Truncate individual messages longer than this many characters to avoid sending large blobs
+MAX_MESSAGE_LENGTH = 1000
+
 def get_groq_response(user_message: str, max_tokens: int = 1000, remember: bool = True):
     """
     Get response from Groq AI
     """
     global chat_history
 
-    # Add user message to history
+    # Add user message to history (but truncate very long messages)
     if remember:
-        chat_history.append({"role": "user", "content": user_message})
+        trimmed = user_message if len(user_message) <= MAX_MESSAGE_LENGTH else user_message[:MAX_MESSAGE_LENGTH] + "..."
+        chat_history.append({"role": "user", "content": trimmed})
+
+    # Optimize history: keep only recent entries to reduce token usage
+    if remember and len(chat_history) > MAX_HISTORY_ENTRIES:
+        chat_history = chat_history[-MAX_HISTORY_ENTRIES:]
+
+    # Ensure individual messages are not excessively long when sending to model
+    def _sanitize_msgs(msgs):
+        sanitized = []
+        for m in msgs:
+            c = m.get("content", "")
+            if len(c) > MAX_MESSAGE_LENGTH:
+                c = c[:MAX_MESSAGE_LENGTH] + "..."
+            sanitized.append({"role": m.get("role"), "content": c})
+        return sanitized
 
     # Build messages including history
     messages = [
-        {"role": "system", "content": "You are EduMate, a helpful AI study assistant."}
+        {"role": "system", "content": "You are EduMate, a concise and helpful AI study assistant. Answer clearly and provide step-by-step guidance when appropriate."}
     ]
 
     if remember:
-        messages += chat_history
+        messages += _sanitize_msgs(chat_history)
     else:
-        messages.append({"role": "user", "content": user_message})
+        messages.append({"role": "user", "content": user_message if len(user_message) <= MAX_MESSAGE_LENGTH else user_message[:MAX_MESSAGE_LENGTH] + "..."})
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # or "llama-3.2-8b-instant"
+            model="llama-3.1-8b-instant",
             messages=messages,
             max_tokens=max_tokens,
         )
-        # Extract AI response
+        # Extract AI response (SDK response shape)
         ai_message = response.choices[0].message.content.strip()
 
         # Add AI message to history

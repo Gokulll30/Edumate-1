@@ -12,6 +12,9 @@ import Navigation from "./components/Navigation";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { QuizProvider } from "./context/QuizContext";
 import { ChatProvider } from "./context/ChatContext";
+import CodingAssistantPage from "./components/coding-assistant/CodingAssistantPage";
+
+
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
 
@@ -89,6 +92,15 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/coding-assistant"
+            element={
+              <ProtectedRoute>
+                <CodingAssistantPage />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
         {showAuthModal && <AuthModal />}

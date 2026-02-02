@@ -1,6 +1,6 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import Navigation from "./Navigation";
-import { Send, Paperclip, Mic, Bot, User, Sparkles, Trash2 } from "lucide-react";
+import { Send, Paperclip, Mic, Bot, User, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChatContext } from "../context/ChatContext";
 import {
@@ -10,6 +10,7 @@ import {
   getChatSessions as apiGetChatSessions,
   createChatSession as apiCreateChatSession,
   deleteChatSession as apiDeleteChatSession,
+  youtubeSearch,
 } from "../services/api";
 
 interface Message {
@@ -147,20 +148,18 @@ export default function ChatInterface() {
   }, []);
 
   const animateBotReply = (fullText: string) => {
+    // fallback: append final bot message after streaming
     chatContext.setTypingContent("");
-    chatContext.setIsTyping(true);
-    setTimeout(() => {
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: "bot",
-        content: fullText,
-        timestamp: new Date(),
-      };
-      chatContext.setMessages((prev) => [...prev, botMessage]);
-      chatContext.setTypingContent("");
-      chatContext.setIsTyping(false);
-    }, 700);
+    chatContext.setIsTyping(false);
+    const botMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: "bot",
+      content: fullText,
+      timestamp: new Date(),
+    };
+    chatContext.setMessages((prev) => [...prev, botMessage]);
   };
+  const [playing, setPlaying] = useState<Record<string, string>>({});
 
   const handleSendMessage = async () => {
     if (!chatContext.inputValue.trim()) return;
@@ -221,25 +220,88 @@ export default function ChatInterface() {
         if (!isNaN(n)) sessionIdToUse = n;
       }
 
-      const data = await sendChatMessage(userMessage.content, sessionIdToUse ?? undefined);
-      if (!data || !data.success) throw new Error(data.error || 'Failed to fetch bot reply');
-
-      let botReply: string = data.reply || '';
-      botReply = botReply.replace(/\*/g, '');
-
-      // After send, refresh sessions to pick up any server-side title updates
+      // Stream the bot reply using the new streaming endpoint
       try {
-        const list = await apiGetChatSessions();
-        if (list && list.success) chatContext.setSessions((prev) => {
-          const server = (list.sessions || []).map((s: any) => ({ ...s, id: Number(s.id), saved: true }));
-          const temps = prev.filter((p) => typeof p.id === 'string' && String(p.id).startsWith('temp-'));
-          return [...server, ...temps];
-        });
-      } catch (err) {
-        console.error('Failed to refresh sessions after send:', err);
-      }
+        chatContext.setTypingContent("");
+        chatContext.setIsTyping(true);
 
-      animateBotReply(botReply);
+        const headers: any = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('authToken');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const resp = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/chat/stream`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ message: userMessage.content, session_id: sessionIdToUse }),
+        });
+
+        if (!resp.ok || !resp.body) {
+          throw new Error('Failed to stream reply');
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        let accumulated = '';
+
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          done = !!d;
+          if (value) {
+            const chunk = decoder.decode(value, { stream: true });
+            // The backend sends SSE-style `data: <text>\n\n`, so strip `data: ` framing
+            const parts = chunk.split('\n\n').filter(Boolean);
+            for (const p of parts) {
+              const text = p.replace(/^data:\s?/, '');
+              accumulated += text;
+              // Update typing content so the UI shows streaming text
+              chatContext.setTypingContent(accumulated);
+            }
+          }
+        }
+
+        // streaming finished: accumulated contains full reply
+        const botReply = accumulated.replace(/\*/g, '');
+
+        // After stream completes, refresh sessions to pick up any server-side title updates
+        try {
+          const list = await apiGetChatSessions();
+          if (list && list.success) chatContext.setSessions((prev) => {
+            const server = (list.sessions || []).map((s: any) => ({ ...s, id: Number(s.id), saved: true }));
+            const temps = prev.filter((p) => typeof p.id === 'string' && String(p.id).startsWith('temp-'));
+            return [...server, ...temps];
+          });
+        } catch (err) {
+          console.error('Failed to refresh sessions after send:', err);
+        }
+
+        animateBotReply(botReply);
+
+        // Fetch related YouTube videos for the user's prompt and attach to the bot message
+        try {
+          const vids = await youtubeSearch(userMessage.content, 2);
+          if (vids && vids.success && vids.videos && vids.videos.length) {
+            chatContext.setMessages((prev) => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (lastIdx >= 0) {
+                const last = updated[lastIdx];
+                updated[lastIdx] = {
+                  ...last,
+                  attachments: vids.videos.slice(0,2).map((v: any) => ({ ...v, type: 'youtube' })),
+                } as any;
+              }
+              return updated;
+            });
+          }
+        } catch (err) {
+          console.error('YouTube attach error:', err);
+        }
+      } catch (errStream) {
+        console.error('Streaming error:', errStream);
+        chatContext.setIsTyping(false);
+        chatContext.setTypingContent('');
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       chatContext.setIsTyping(false);
@@ -288,12 +350,7 @@ export default function ChatInterface() {
       hour12: true,
     });
 
-  const suggestedPrompts = [
-    "Create a study schedule for my upcoming exams",
-    "Generate a quiz from my uploaded PDF",
-    "Help me understand machine learning concepts",
-    "Set up reminders for my study sessions",
-  ];
+
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -462,8 +519,8 @@ export default function ChatInterface() {
           {/* Right: Chat area */}
           <section className="flex-1 flex flex-col bg-gray-900">
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-900">
-              <div className="w-full px-8">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-900 pb-32">
+              <div className="w-full">
                 {chatContext.messages.map((message) => (
                   <div
                     key={message.id}
@@ -497,6 +554,38 @@ export default function ChatInterface() {
                         <p className="whitespace-pre-wrap leading-relaxed">
                           {message.content}
                         </p>
+                        {/* Attachments (e.g., YouTube results) */}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-3 space-y-3">
+                            {message.attachments.map((att: any, idx: number) => (
+                              <div key={idx} className="flex flex-col">
+                                <div
+                                  className="flex items-center space-x-3 cursor-pointer hover:bg-slate-800 p-2 rounded"
+                                  onClick={() => setPlaying((prev) => ({ ...prev, [message.id]: att.videoId }))}
+                                >
+                                  {att.thumbnail && (
+                                    <img src={att.thumbnail} alt={att.title} className="w-28 h-16 object-cover rounded" />
+                                  )}
+                                  <div className="flex-1">
+                                    <div className="text-sm text-slate-100 font-medium">{att.title}</div>
+                                    <div className="text-xs text-slate-400">{att.channelTitle}</div>
+                                  </div>
+                                </div>
+                                {playing[message.id] === att.videoId && (
+                                  <div className="mt-3">
+                                    <iframe
+                                      className="w-full h-64 rounded-lg"
+                                      src={`https://www.youtube.com/embed/${att.videoId}?autoplay=1`}
+                                      title={att.title}
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 mt-2">
                         {formatTime(message.timestamp)}
@@ -521,26 +610,9 @@ export default function ChatInterface() {
             </div>
           </section>
         </div>
-        {/* Suggested Prompts */}
-        {chatContext.messages.length === 1 && (
-          <div className="px-8 pb-4 bg-gray-900">
-            <p className="text-slate-400 text-xs mb-2">Try asking me about:</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {suggestedPrompts.map((prompt, index) => (
-                <button
-                  key={index}
-                  onClick={() => chatContext.setInputValue(prompt)}
-                  className="text-left p-3 bg-slate-800 border border-slate-700 hover:border-purple-500 rounded-lg text-slate-200 hover:text-white transition-all duration-300 text-sm shadow-sm"
-                >
-                  <Sparkles className="w-4 h-4 inline mr-2 text-purple-400" />
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* Input Area */}
-        <div className="bg-slate-900 border-t border-slate-700 p-6">
+        
+        {/* Input Area: fixed to bottom to avoid being pushed down by long responses */}
+        <div className="fixed left-64 right-0 bottom-0 z-40 bg-slate-900 border-t border-slate-700 p-6">
           <div className="flex items-center space-x-3">
             <input
               type="file"
