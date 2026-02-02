@@ -873,6 +873,31 @@ export const uploadChatFile = async (
   }
 };
 
+// YouTube search via backend (keeps API key secret)
+export const youtubeSearch = async (
+  query: string,
+      maxResults: number = 2
+): Promise<{
+  success: boolean;
+  videos: Array<{ videoId: string; title: string; description?: string; channelTitle?: string; thumbnail?: string; publishTime?: string }>;
+  error?: string;
+}> => {
+  try {
+    const response = await fetch(`${API_BASE}/chat/youtube/search`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ query, maxResults }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to search YouTube');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('YouTube search error:', error);
+    return { success: false, videos: [], error: error instanceof Error ? error.message : 'YouTube search failed' };
+  }
+};
+
 // ===== AI AGENT API =====
 
 // Run AI Agent cycle (analyzes performance & schedules tests)
