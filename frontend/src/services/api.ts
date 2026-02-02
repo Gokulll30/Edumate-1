@@ -1067,10 +1067,21 @@ export type GeminiAnalysis = {
 
 export type RunCodeResponse = {
   success: boolean;
-  result?: ExecutionResult;
-  analysis?: GeminiAnalysis;
+  result?: {
+    passed: boolean;
+    testResults: {
+      input: any;
+      expected: any;
+      actual: any;
+      passed: boolean;
+    }[];
+  };
+  analysis?: {
+    summary: string;
+  };
   error?: string;
 };
+
 
 // =====================================================
 // API CALLS

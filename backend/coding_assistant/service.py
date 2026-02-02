@@ -114,43 +114,71 @@ class CodingAssistantService:
 
 def analyze_execution_result(problem, user_code, execution_result):
     """
-    Uses Gemini to explain execution errors / failures / success
+    Uses Gemini to explain why the solution failed / passed.
+    MUST NEVER break execution.
     """
 
-    prompt = f"""
-You are a professional coding interview evaluator.
+    try:
+        # If all tests passed, give positive feedback
+        if execution_result.get("passed") is True:
+            prompt = f"""
+You are a coding mentor.
 
-Problem Title:
-{problem.get("title")}
+The user solved the problem "{problem['title']}" correctly.
 
-Problem Description:
-{problem.get("description")}
+Briefly:
+1. Confirm the approach is correct
+2. Mention the key idea used
+3. Suggest one possible optimization (if any)
 
-Expected Function Name:
-{problem.get("function_name")}
+Keep it short and professional.
+"""
+        else:
+            failed_cases = [
+                tc for tc in execution_result.get("testResults", [])
+                if not tc.get("passed")
+            ]
 
-User Code:
+            first_fail = failed_cases[0]
+
+            prompt = f"""
+You are a coding mentor helping debug a solution.
+
+Problem:
+{problem['title']}
+{problem['description']}
+
+User code:
 {user_code}
 
-Execution Result (raw):
-{execution_result}
+A test case failed.
 
-Your task:
-1. If the code failed, clearly explain WHY in technical terms.
-2. If there are errors, list them clearly (bullet points).
-3. Give ONE short hint to fix the issue (not full solution).
-4. If multiple test cases failed, explain each briefly.
-5. If all test cases passed, confirm correctness concisely.
+Input:
+{first_fail['input']}
 
-Keep response short, clear, and professional.
+Expected output:
+{first_fail['expected']}
+
+User output:
+{first_fail['actual']}
+
+Explain clearly:
+1. Why this output is wrong
+2. What logic mistake likely caused it
+3. Give ONE small hint (not full solution)
 """
 
-    try:
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
         )
-        return response.text
+
+        return {
+            "summary": response.text.strip()
+        }
 
     except Exception as e:
-        return f"Analysis failed: {str(e)}"
+        # 🔒 SAFETY NET — NEVER FAIL EXECUTION
+        return {
+            "summary": "Code executed successfully, but explanation is temporarily unavailable."
+        }

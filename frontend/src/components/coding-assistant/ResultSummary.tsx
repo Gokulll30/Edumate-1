@@ -27,9 +27,9 @@ type RunCodeResponse = {
 export default function ResultSummary({ result }: { result: RunCodeResponse }) {
   if (!result) return null;
 
-  // ----------------------------
-  // HARD FAILURE (syntax/runtime before tests)
-  // ----------------------------
+  /* =====================================
+     HARD FAILURE (syntax / runtime error)
+     ===================================== */
   if (!result.success) {
     return (
       <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
@@ -43,8 +43,8 @@ export default function ResultSummary({ result }: { result: RunCodeResponse }) {
     );
   }
 
-  const passedAll = result.result?.passed;
-  const testResults = result.result?.testResults || [];
+  const passedAll = result.result?.passed ?? false;
+  const testResults = result.result?.testResults ?? [];
   const analysis = result.analysis;
 
   return (
@@ -69,21 +69,21 @@ export default function ResultSummary({ result }: { result: RunCodeResponse }) {
       </div>
 
       {/* =========================
-          GEMINI ANALYSIS
+          GEMINI AI FEEDBACK
          ========================= */}
-      {analysis && (
+      {analysis?.summary && (
         <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 space-y-3">
           <h4 className="text-purple-400 font-semibold">
             🤖 AI Feedback
           </h4>
 
           {/* Summary */}
-          <p className="text-slate-300 text-sm">
+          <p className="text-slate-300 text-sm whitespace-pre-wrap">
             {analysis.summary}
           </p>
 
-          {/* Errors */}
-          {analysis.errors && analysis.errors.length > 0 && (
+          {/* Optional Errors (future-ready) */}
+          {Array.isArray(analysis.errors) && analysis.errors.length > 0 && (
             <div>
               <p className="text-red-400 font-semibold text-sm mb-1">
                 Issues Detected:
@@ -96,7 +96,7 @@ export default function ResultSummary({ result }: { result: RunCodeResponse }) {
             </div>
           )}
 
-          {/* Hint */}
+          {/* Optional Hint (future-ready) */}
           {analysis.hint && (
             <div className="bg-slate-800 border border-slate-600 rounded p-3 text-sm">
               <span className="text-yellow-400 font-semibold">
