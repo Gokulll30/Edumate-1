@@ -298,7 +298,7 @@ export default function ChatInterface() {
   return (
     <div className="min-h-screen bg-gray-900">
       <Navigation />
-      <main className="ml-64 flex flex-col h-screen">
+      <main className="ml-64 flex flex-col h-screen bg-gray-900">
         {/* Header */}
         <div className="bg-slate-900 border-b border-slate-700 p-6">
           <div className="flex items-center space-x-3">
@@ -460,22 +460,22 @@ export default function ChatInterface() {
           </aside>
 
           {/* Right: Chat area */}
-          <section className="flex-1 flex flex-col pr-8">
+          <section className="flex-1 flex flex-col bg-gray-900">
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-900">
-              <div className="w-full">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-900">
+              <div className="w-full px-8">
                 {chatContext.messages.map((message) => (
                   <div
                     key={message.id}
                     className={`flex items-start space-x-4 ${message.type === "user"
-                        ? "flex-row-reverse space-x-reverse"
-                        : ""
+                      ? "flex-row-reverse space-x-reverse"
+                      : ""
                       }`}
                   >
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${message.type === "user"
-                          ? "bg-gradient-to-r from-blue-500 to-cyan-500"
-                          : "bg-gradient-to-r from-purple-500 to-pink-500"
+                        ? "bg-gradient-to-r from-blue-500 to-cyan-500"
+                        : "bg-gradient-to-r from-purple-500 to-pink-500"
                         }`}
                     >
                       {message.type === "user" ? (
@@ -490,8 +490,8 @@ export default function ChatInterface() {
                     >
                       <div
                         className={`inline-block p-4 rounded-2xl shadow-md ${message.type === "user"
-                            ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
-                            : "bg-slate-800 border border-slate-700 text-white"
+                          ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
+                          : "bg-slate-800 border border-slate-700 text-white"
                           }`}
                       >
                         <p className="whitespace-pre-wrap leading-relaxed">
@@ -524,15 +524,15 @@ export default function ChatInterface() {
         {/* Suggested Prompts */}
         {chatContext.messages.length === 1 && (
           <div className="px-8 pb-4 bg-gray-900">
-            <p className="text-slate-400 text-sm mb-3">Try asking me about:</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <p className="text-slate-400 text-xs mb-2">Try asking me about:</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {suggestedPrompts.map((prompt, index) => (
                 <button
                   key={index}
                   onClick={() => chatContext.setInputValue(prompt)}
-                  className="text-left p-4 bg-slate-800 border border-slate-700 hover:border-purple-500 rounded-xl text-slate-200 hover:text-white transition-all duration-300 text-base shadow-sm"
+                  className="text-left p-3 bg-slate-800 border border-slate-700 hover:border-purple-500 rounded-lg text-slate-200 hover:text-white transition-all duration-300 text-sm shadow-sm"
                 >
-                  <Sparkles className="w-5 h-5 inline mr-2 text-purple-400" />
+                  <Sparkles className="w-4 h-4 inline mr-2 text-purple-400" />
                   {prompt}
                 </button>
               ))}

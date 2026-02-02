@@ -12,7 +12,6 @@ import Navigation from "./components/Navigation";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { QuizProvider } from "./context/QuizContext";
 import { ChatProvider } from "./context/ChatContext";
-
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
 
@@ -108,4 +107,4 @@ export default function App() {
       </QuizProvider>
     </AuthProvider>
   );
-}
+} 
