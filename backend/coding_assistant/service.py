@@ -107,3 +107,50 @@ class CodingAssistantService:
             if problem.get("id") == problem_id:
                 return problem
         return None
+
+# ======================================================
+# NEW: Execution Result Analysis (Gemini-powered)
+# ======================================================
+
+def analyze_execution_result(problem, user_code, execution_result):
+    """
+    Uses Gemini to explain execution errors / failures / success
+    """
+
+    prompt = f"""
+You are a professional coding interview evaluator.
+
+Problem Title:
+{problem.get("title")}
+
+Problem Description:
+{problem.get("description")}
+
+Expected Function Name:
+{problem.get("function_name")}
+
+User Code:
+{user_code}
+
+Execution Result (raw):
+{execution_result}
+
+Your task:
+1. If the code failed, clearly explain WHY in technical terms.
+2. If there are errors, list them clearly (bullet points).
+3. Give ONE short hint to fix the issue (not full solution).
+4. If multiple test cases failed, explain each briefly.
+5. If all test cases passed, confirm correctness concisely.
+
+Keep response short, clear, and professional.
+"""
+
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
+
+    except Exception as e:
+        return f"Analysis failed: {str(e)}"

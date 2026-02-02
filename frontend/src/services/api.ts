@@ -1002,25 +1002,54 @@ export type ProblemDetail = {
   title: string;
   difficulty: string;
   description: string;
-  examples?: any[];
+  function_name?: string;
+  examples?: {
+    input: any;
+    output: any;
+  }[];
   constraints?: string[];
   starterCode?: Record<string, string>;
-  testCases?: any[];
+  test_cases?: {
+    input: any;
+    output: any;
+  }[];
 };
+
+// ---------- EXECUTION TYPES ----------
+
+export type TestResult = {
+  input: any;
+  expected: any;
+  actual: any;
+  passed: boolean;
+  error?: string; // runtime / syntax / assertion error
+};
+
+export type ExecutionResult = {
+  passed: boolean;
+  testResults: TestResult[];
+};
+
+// ---------- GEMINI ANALYSIS ----------
+
+export type GeminiAnalysis = {
+  summary: string;        // Overall explanation
+  errors?: string[];      // What went wrong (bullet list)
+  hint?: string;          // One-line improvement hint
+};
+
+// ---------- FINAL RUN RESPONSE ----------
 
 export type RunCodeResponse = {
   success: boolean;
-  result?: {
-    passed: boolean;
-    testResults: {
-      input: any;
-      expected: any;
-      actual: any;
-      passed: boolean;
-    }[];
-  };
+  result?: ExecutionResult;
+  analysis?: GeminiAnalysis;
   error?: string;
 };
+
+// =====================================================
+// API CALLS
+// =====================================================
 
 // ✅ Get all problems
 export async function getProblems(): Promise<{
@@ -1040,7 +1069,7 @@ export async function getProblemById(id: string): Promise<{
   return res.json();
 }
 
-// ✅ Run code against test cases
+// ✅ Run code against test cases (Gemini-enhanced)
 export async function runProblemCode({
   problemId,
   code,

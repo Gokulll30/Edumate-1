@@ -4,20 +4,33 @@
     "title": "Two Sum",
     "difficulty": "Easy",
     "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-    "function_name": "twoSum",
+    "functionName": "twoSum",
+
+    "examples": [
+      {
+        "input": "nums = [2,7,11,15], target = 9",
+        "output": "[0,1]"
+      },
+      {
+        "input": "nums = [3,2,4], target = 6",
+        "output": "[1,2]"
+      }
+    ],
+
     "starterCode": {
       "python": "def twoSum(nums, target):\n    pass",
       "cpp": "vector<int> twoSum(vector<int>& nums, int target) {\n    \n}",
       "javascript": "var twoSum = function(nums, target) {\n\n};"
     },
-    "test_cases": [
+
+    "testCases": [
       {
         "input": { "nums": [2, 7, 11, 15], "target": 9 },
-        "output": [0, 1]
+        "expected": [0, 1]
       },
       {
         "input": { "nums": [3, 2, 4], "target": 6 },
-        "output": [1, 2]
+        "expected": [1, 2]
       }
     ]
   },
@@ -27,14 +40,23 @@
     "title": "Reverse String",
     "difficulty": "Easy",
     "description": "Write a function that reverses a string.",
-    "function_name": "reverseString",
+    "functionName": "reverseString",
+
+    "examples": [
+      {
+        "input": "s = \"hello\"",
+        "output": "\"olleh\""
+      }
+    ],
+
     "starterCode": {
       "python": "def reverseString(s):\n    pass"
     },
-    "test_cases": [
+
+    "testCases": [
       {
         "input": { "s": "hello" },
-        "output": "olleh"
+        "expected": "olleh"
       }
     ]
   }

@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from .service import CodingAssistantService
+from .service import CodingAssistantService, analyze_execution_result
 from .execution import run_python_code
 
 # ------------------------------------------------
@@ -23,7 +23,7 @@ def get_all_problems():
             {
                 "id": p["id"],
                 "title": p["title"],
-                "difficulty": p["difficulty"].capitalize()
+                "difficulty": str(p.get("difficulty", "Easy")).capitalize()
             }
             for p in problems
         ]
@@ -96,23 +96,40 @@ def run_code():
                 "message": "Problem not found"
             }), 404
 
-        # ⚠️ For now we support Python only (safe + controlled)
+        # Python only (safe execution)
         if language != "python":
             return jsonify({
                 "success": False,
                 "message": "Only Python execution supported currently"
             }), 400
 
-        # Run code against test cases
-        result = run_python_code(
+        function_name = problem.get("function_name")
+        test_cases = problem.get("test_cases")
+
+        if not function_name or not test_cases:
+            return jsonify({
+                "success": False,
+                "message": "Problem configuration is invalid"
+            }), 500
+
+        # Run code
+        execution_result = run_python_code(
             user_code=code,
-            function_name=problem["functionName"],
-            test_cases=problem["testCases"]
+            function_name=function_name,
+            test_cases=test_cases
+        )
+
+        # Gemini explanation (safe)
+        explanation = analyze_execution_result(
+            problem=problem,
+            user_code=code,
+            execution_result=execution_result
         )
 
         return jsonify({
             "success": True,
-            "result": result
+            "result": execution_result,
+            "analysis": explanation
         })
 
     except Exception as e:
