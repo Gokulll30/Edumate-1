@@ -28,8 +28,12 @@ if os.path.exists('/etc/secrets/client_secret.json'):
 else:
     # fallback for local/dev
     CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), '..', 'client_secret.json')
-with open(CLIENT_SECRETS_FILE) as f:
-    secret = json.load(f)
+try:
+    with open(CLIENT_SECRETS_FILE) as f:
+        secret = json.load(f)
+except Exception as e:
+    print(f"⚠️ Warning: perform_calendar_init failed: {e}")
+    secret = None
 
 REDIRECT_URI = os.environ.get('REDIRECT_URI', 'https://edumate-2026.vercel.app/calendar_app/oauth2callback')
 # ===== OAUTH ROUTES =====

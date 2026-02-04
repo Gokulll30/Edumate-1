@@ -1,18 +1,19 @@
 import os
 import sys
-from flask import Flask, jsonify, g, request
-from flask_cors import CORS
 from dotenv import load_dotenv
-from db import get_db_connection
-import mysql.connector.errors
-# ✅ ADD THIS IMPORT
-from jobs.cron_jobs import start_agent_cron_job
+
 # Load env variables from .env in parent folder
 APP_DIR = os.path.dirname(__file__)
-load_dotenv(os.path.join(APP_DIR, "..", ".env"))
+load_dotenv(os.path.join(APP_DIR, ".env"))
 
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
+
+from flask import Flask, jsonify, g, request
+from flask_cors import CORS
+from db import get_db_connection
+import mysql.connector.errors
+from jobs.cron_jobs import start_agent_cron_job
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "407e6953e465af96b5924046abf3a16adfbae2cd20864d9eeb913e6b252221b3")

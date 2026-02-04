@@ -112,73 +112,146 @@ class CodingAssistantService:
 # NEW: Execution Result Analysis (Gemini-powered)
 # ======================================================
 
-def analyze_execution_result(problem, user_code, execution_result):
+
+# ======================================================
+# NEW: Execution Result Analysis & Optimization Check
+# ======================================================
+
+def analyze_execution_result(problem, user_code, execution_result, language="python"):
     """
-    Uses Gemini to explain why the solution failed / passed.
-    MUST NEVER break execution.
+    Uses Gemini to:
+    1. Explain failure (if failed)
+    2. Check for complexity/optimization (if passed)
     """
 
     try:
-        # If all tests passed, give positive feedback
+        # If all tests passed, check optimization
         if execution_result.get("passed") is True:
             prompt = f"""
-You are a coding mentor.
+You are a strict coding interviewer.
+The user solved the problem "{problem['title']}" in {language}.
 
-The user solved the problem "{problem['title']}" correctly.
+User Code:
+{user_code}
 
-Briefly:
-1. Confirm the approach is correct
-2. Mention the key idea used
-3. Suggest one possible optimization (if any)
+Task:
+1. Determine the Time and Space Complexity of this code.
+2. Is this the most optimal solution? (Yes/No)
+3. If No, briefly suggest the optimal approach (don't write code).
+4. Provide a very short positive reinforcement.
 
-Keep it short and professional.
+Output Format (JSON):
+{{
+  "is_optimized": true/false,
+  "complexity": "Time: O(...), Space: O(...)",
+  "message": "Start with 'You can optimize your code by thinking a bit more' if not optimized. Otherwise praise."
+}}
 """
+            response = gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config={'response_mime_type': 'application/json'}
+            )
+            
+            return json.loads(response.text)
+
+        # If failed, explain error
         else:
             failed_cases = [
                 tc for tc in execution_result.get("testResults", [])
                 if not tc.get("passed")
             ]
-
-            first_fail = failed_cases[0]
+            first_fail = failed_cases[0] if failed_cases else {}
 
             prompt = f"""
-You are a coding mentor helping debug a solution.
+You are a coding mentor which helps the user to debug code.
+Problem: {problem['title']}
+Language: {language}
 
-Problem:
-{problem['title']}
-{problem['description']}
-
-User code:
+User Code:
 {user_code}
 
-A test case failed.
+Failed Test Case:
+Input: {first_fail.get('input')}
+Expected: {first_fail.get('expected')}
+Actual: {first_fail.get('actual')}
+Error: {first_fail.get('error')}
 
-Input:
-{first_fail['input']}
-
-Expected output:
-{first_fail['expected']}
-
-User output:
-{first_fail['actual']}
-
-Explain clearly:
-1. Why this output is wrong
-2. What logic mistake likely caused it
-3. Give ONE small hint (not full solution)
+Task:
+Explain the logical error or syntax error clearly. Give a small hint.
 """
+            response = gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
 
-        response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-
-        return {
-            "summary": response.text.strip()
-        }
+            return {
+                "is_optimized": False,
+                "complexity": "N/A",
+                "message": response.text.strip()
+            }
 
     except Exception as e:
-        # 🔒 SAFETY NET — NEVER FAIL EXECUTION
         return {
-            "summary": "Code executed successfully, but explanation is temporarily unavailable."
+            "is_optimized": False,
+            "complexity": "Unknown",
+            "message": f"Analysis unavailable: {str(e)}"
+        }
+
+def evaluate_code_with_gemini(language, code, problem):
+    """
+    Simulates execution for C++, Java, JS using Gemini.
+    """
+    try:
+        test_cases_str = json.dumps(problem.get("test_cases", []))
+        
+        prompt = f"""
+You are a code execution engine.
+Language: {language}
+Problem: {problem['title']}
+Function Name: {problem['function_name']}
+
+User Code:
+{code}
+
+Test Cases:
+{test_cases_str}
+
+Task:
+1. "Run" the code mentally against each test case.
+2. Verify if it compiles/interprets correctly.
+3. Return results in strict JSON format.
+
+Output JSON Structure:
+{{
+  "passed": true/false,  // verified all tests
+  "testResults": [
+    {{
+      "input": "...",
+      "expected": "...",
+      "actual": "...",
+      "passed": true/false,
+      "error": "error message or null"
+    }}
+  ]
+}}
+"""
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={'response_mime_type': 'application/json'}
+        )
+        
+        return json.loads(response.text)
+
+    except Exception as e:
+        return {
+            "passed": False,
+            "testResults": [
+                {
+                    "input": "System Error",
+                    "passed": False,
+                    "error": f"Gemini Execution Failed: {str(e)}"
+                }
+            ]
         }

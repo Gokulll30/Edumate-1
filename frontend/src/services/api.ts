@@ -876,7 +876,7 @@ export const uploadChatFile = async (
 // YouTube search via backend (keeps API key secret)
 export const youtubeSearch = async (
   query: string,
-      maxResults: number = 2
+  maxResults: number = 2
 ): Promise<{
   success: boolean;
   videos: Array<{ videoId: string; title: string; description?: string; channelTitle?: string; thumbnail?: string; publishTime?: string }>;
@@ -1061,6 +1061,8 @@ export type GeminiAnalysis = {
   summary: string;        // Overall explanation
   errors?: string[];      // What went wrong (bullet list)
   hint?: string;          // One-line improvement hint
+  is_optimized?: boolean;
+  message?: string;
 };
 
 // ---------- FINAL RUN RESPONSE ----------
@@ -1076,9 +1078,7 @@ export type RunCodeResponse = {
       passed: boolean;
     }[];
   };
-  analysis?: {
-    summary: string;
-  };
+  analysis?: GeminiAnalysis;
   error?: string;
 };
 
@@ -1110,18 +1110,63 @@ export async function runProblemCode({
   problemId,
   code,
   language,
+  userId,
 }: {
   problemId: string;
   code: string;
-  language: "python" | "cpp" | "javascript";
+  language: "python" | "cpp" | "javascript" | "java";
+  userId?: number;
 }): Promise<RunCodeResponse> {
   const res = await fetch(`${API_BASE}/coding-assistant/run`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ problemId, code, language }),
+    body: JSON.stringify({ problemId, code, language, userId }),
   });
 
   return res.json();
 }
+
+export const submitProblemScore = async (data: {
+  userId: number;
+  problemId: string;
+  score: number;
+  isOptimized: boolean;
+  language: string;
+  code: string;
+}) => {
+  try {
+    const res = await fetch(`${API_BASE}/coding-assistant/submit-score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err };
+  }
+};
+
+export const getCodingHistory = async (userId: number) => {
+  try {
+    const res = await fetch(`${API_BASE}/coding-assistant/history/${userId}?t=${Date.now()}`);
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err };
+  }
+};
+// Get user coding stats
+export const getUserCodingStats = async (userId: number): Promise<{ success: boolean; stats?: { solved_count: number; total_points: number }; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE}/coding-assistant/stats/${userId}?t=${Date.now()}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Get coding stats error:", error);
+    return { success: false, error: "Failed to fetch stats" };
+  }
+};

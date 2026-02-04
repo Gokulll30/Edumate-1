@@ -1,4 +1,5 @@
 import mysql.connector
+import threading
 from mysql.connector import pooling, errors
 import os
 from datetime import datetime, timedelta, timezone
@@ -9,6 +10,7 @@ from decimal import Decimal
 
 # MySQL connection pool variable
 DB_POOL = None
+POOL_LOCK = threading.Lock()
 
 # IST time helper (India Standard Time, UTC+05:30)
 def _now_ist_iso():
@@ -28,40 +30,52 @@ def _print_db_env_vars():
 def init_db_pool():
     """Initialize MySQL connection pool safely"""
     global DB_POOL
-    if DB_POOL:
-        return
+    
+    with POOL_LOCK:
+        if DB_POOL:
+            return
 
-    host = os.environ.get("MYSQL_HOST", "localhost")
-    user = os.environ.get("MYSQL_USER", "root")
-    password = os.environ.get("MYSQL_PASSWORD", "")
-    database = os.environ.get("MYSQL_DB", "edumate")
+        host = os.environ.get("MYSQL_HOST", "localhost")
+        user = os.environ.get("MYSQL_USER", "root")
+        password = os.environ.get("MYSQL_PASSWORD", "")
+        database = os.environ.get("MYSQL_DB", "edumate")
 
-    _print_db_env_vars()
+        _print_db_env_vars()
 
-    if user == "root" and password == "":
-        print("❌ Warning: Root user configured with empty password. Please set MYSQL_PASSWORD environment variable.")
-
-    try:
-        DB_POOL = pooling.MySQLConnectionPool(
-            pool_name="edumate_pool",
-            pool_size=2,
-            host=host,
-            user=user,
-            password=password,
-            database=database,
-            auth_plugin="mysql_native_password"
-        )
-        print(f"✅ MySQL Pool Initialized → {user}@{host} ({database})")
-    except errors.Error as e:
-        print(f"❌ Database connection error: {e}")
-        raise
+        try:
+            DB_POOL = pooling.MySQLConnectionPool(
+                pool_name="edumate_pool",
+                pool_size=2,
+                pool_reset_session=True,
+                host=host,
+                user=user,
+                password=password,
+                database=database,
+                auth_plugin="mysql_native_password"
+            )
+            print(f"✅ MySQL Pool Initialized → {user}@{host} ({database})")
+        except errors.Error as e:
+            print(f"❌ Database connection error: {e}")
+            raise
 
 def get_db_connection():
     """Get database connection with proper Flask context handling"""
     if 'db' not in g:
         if DB_POOL is None:
             init_db_pool()
-        g.db = DB_POOL.get_connection()
+        
+        # Retry logic for connection pool exhaustion
+        retries = 20
+        for i in range(retries):
+            try:
+                g.db = DB_POOL.get_connection()
+                return g.db
+            except errors.PoolError:
+                if i == retries - 1:
+                    print("❌ DB Pool Exhausted after retries")
+                    raise
+                import time
+                time.sleep(0.2 * (i + 1)) # Linear backoff
     return g.db
 
 # ===== TABLE CREATION =====
@@ -264,6 +278,22 @@ def _ensure_tables(conn):
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         INDEX idx_state (state),
         INDEX idx_expires (expires_at)
+    )
+    """)
+
+    # Coding attempts tracking
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS coding_attempts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        problem_id VARCHAR(255) NOT NULL,
+        score INT DEFAULT 0,
+        status VARCHAR(50), 
+        is_optimized TINYINT(1) DEFAULT 0,
+        language VARCHAR(50),
+        code TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
     )
     """)
     
@@ -750,6 +780,63 @@ def schedule_quiz_retake_if_needed(user_id: int, subject: str, taken_at: str, sc
     
     conn.commit()
     cur.close()
+
+
+# ===== CODING ASSISTANT FUNCTIONS =====
+
+def save_coding_attempt(user_id: int, problem_id: str, score: int, status: str, 
+                        is_optimized: bool, language: str, code: str) -> int:
+    """Save a coding attempt"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+    INSERT INTO coding_attempts (user_id, problem_id, score, status, is_optimized, language, code)
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (user_id, problem_id, score, status, 1 if is_optimized else 0, language, code))
+    
+    attempt_id = cur.lastrowid
+    conn.commit()
+    cur.close()
+    return attempt_id
+
+def get_coding_history(user_id: int, limit: int = 5) -> List[Dict]:
+    """Fetch recent coding attempts"""
+    conn = get_db_connection()
+    cur = conn.cursor(dictionary=True)
+    
+    cur.execute("""
+    SELECT id, problem_id, score, status, is_optimized, language, created_at
+    FROM coding_attempts 
+    WHERE user_id = %s 
+    ORDER BY created_at DESC 
+    LIMIT %s
+    """, (user_id, limit))
+    
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+def get_coding_stats(user_id: int):
+    """Get aggregated coding statistics for a user"""
+    conn = get_db_connection()
+    cur = conn.cursor(dictionary=True)
+    
+    # Count distinct solved problems
+    cur.execute("""
+        SELECT COUNT(DISTINCT problem_id) as solved_count, 
+               COALESCE(SUM(score), 0) as total_points 
+        FROM coding_attempts 
+        WHERE user_id = %s AND status = 'solved'
+    """, (user_id,))
+    
+    result = cur.fetchone()
+    cur.close()
+    
+    return {
+        "solved_count": result["solved_count"] if result else 0,
+        "total_points": int(result["total_points"]) if result else 0
+    }
 
 # ===== INITIALIZE DATABASE =====
 
