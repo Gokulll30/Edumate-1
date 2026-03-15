@@ -98,6 +98,16 @@ export default function ProgressTracker() {
   };
 
   const periodStats = getPeriodStats(selectedPeriod);
+
+  const achievements: Achievement[] = [
+    {
+      id: '1',
+      title: 'Study Streak Master',
+      description: 'Study for 7 consecutive days',
+      icon: Award,
+      completed: true,
+      completedDate: '2025-11-12'
+    },
     {
       id: '2',
       title: 'Quiz Champion',
@@ -128,6 +138,7 @@ export default function ProgressTracker() {
       completed: true,
       completedDate: '2025-11-13'
     }
+  ];
   ];
 
   const weeklyData = [
