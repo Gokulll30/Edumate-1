@@ -60,7 +60,6 @@ function normalizeDateString(dateStr: string): string {
 
 export default function StudyPlanner() {
   const { user } = useAuth();
-  const [view, setView] = useState<'calendar' | 'list'>('calendar');
   const [selectedDate, setSelectedDate] = useState(normalizeDateString(new Date().toISOString()));
   const [showAddModal, setShowAddModal] = useState(false);
   const [sessions, setSessions] = useState<StudySession[]>([]);
@@ -453,12 +452,21 @@ export default function StudyPlanner() {
   };
 
   const upcomingSessions = sessions
-    .filter(s => !s.completed && new Date(`${s.date}T${s.time}`) >= new Date())
-    .sort(
-      (a, b) =>
-        new Date(`${a.date}T${a.time}`).getTime() -
-        new Date(`${b.date}T${b.time}`).getTime()
-    );
+    .filter(s => {
+      if (s.completed) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const sessionDate = new Date(s.date);
+      sessionDate.setHours(0, 0, 0, 0);
+
+      return sessionDate >= today;
+    })
+    .sort((a, b) => {
+      const aDate = new Date(a.date);
+      const bDate = new Date(b.date);
+      return aDate.getTime() - bDate.getTime();
+    });
 
   const minDate = normalizeDateString(new Date().toISOString());
 
@@ -473,31 +481,17 @@ export default function StudyPlanner() {
             <p className="text-slate-400">Organize your study sessions and track your progress</p>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="flex bg-slate-800 rounded-lg p-1 shadow">
-              <button
-                onClick={() => setView('calendar')}
-                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  view === 'calendar'
-                    ? 'bg-purple-600 text-white shadow'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                style={{ minWidth: '100px' }}
-              >
-                Calendar
-              </button>
-              <button
-                onClick={() => setView('list')}
-                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  view === 'list'
-                    ? 'bg-purple-600 text-white shadow'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                style={{ minWidth: '100px' }}
-              >
-                List
-              </button>
-            </div>
             <button
+              onClick={() => {
+                if (!user) return alert('Please sign in to add sessions');
+                setShowAddModal(true);
+              }}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 rounded-xl font-semibold flex items-center space-x-2 transition-all duration-300 transform hover:scale-105 text-lg shadow"
+              style={{ minWidth: '160px' }}
+            >
+              <Plus className="w-6 h-6" />
+              <span>Add Session</span>
+            </button>
               onClick={() => {
                 if (!user) return alert('Please sign in to add sessions');
                 setShowAddModal(true);
