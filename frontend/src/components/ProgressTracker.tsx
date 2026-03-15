@@ -99,48 +99,6 @@ export default function ProgressTracker() {
 
   const periodStats = getPeriodStats(selectedPeriod);
 
-  const achievements: Achievement[] = [
-    {
-      id: '1',
-      title: 'Study Streak Master',
-      description: 'Study for 7 consecutive days',
-      icon: Award,
-      completed: true,
-      completedDate: '2025-11-12'
-    },
-    {
-      id: '2',
-      title: 'Quiz Champion',
-      description: 'Score above 90% in 5 quizzes',
-      icon: Target,
-      completed: true,
-      completedDate: '2025-11-10'
-    },
-    {
-      id: '3',
-      title: 'Time Master',
-      description: 'Study for 50+ hours this month',
-      icon: Clock,
-      completed: false
-    },
-    {
-      id: '4',
-      title: 'Knowledge Seeker',
-      description: 'Complete 100 study sessions',
-      icon: BookOpen,
-      completed: false
-    },
-    {
-      id: '5',
-      title: 'AI Assistant Pro',
-      description: 'Use AI chat for 30+ conversations',
-      icon: Brain,
-      completed: true,
-      completedDate: '2025-11-13'
-    }
-  ];
-  ];
-
   const weeklyData = [
     { label: 'Mon', hours: 3.8, score: 87 },
     { label: 'Tue', hours: 2.4, score: 91 },
