@@ -200,14 +200,14 @@ export default function Dashboard() {
       {
         label: "Completed Sessions",
         value: isNewUser ? 0 : progress.completedSessions || 0,
-        change: isNewUser ? "+0%" : "+8%",
+        change: isNewUser ? "+0%" : (progress.completedSessions > 0 ? "+8%" : "+0%"),
         icon: CheckCircle2,
         color: "green",
       },
       {
         label: "Average Score",
         value: isNewUser ? "—" : `${progress.completionRate || 0}%`,
-        change: isNewUser ? "+0%" : "+5%",
+        change: isNewUser ? "+0%" : (progress.completionRate > 0 ? "+5%" : "+0%"),
         icon: Target,
         color: "blue",
       },
