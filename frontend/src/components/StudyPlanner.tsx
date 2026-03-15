@@ -452,21 +452,12 @@ export default function StudyPlanner() {
   };
 
   const upcomingSessions = sessions
-    .filter(s => {
-      if (s.completed) return false;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const sessionDate = new Date(s.date);
-      sessionDate.setHours(0, 0, 0, 0);
-
-      return sessionDate >= today;
-    })
-    .sort((a, b) => {
-      const aDate = new Date(a.date);
-      const bDate = new Date(b.date);
-      return aDate.getTime() - bDate.getTime();
-    });
+    .filter(s => !s.completed && new Date(`${s.date}T${s.time}`) >= new Date())
+    .sort(
+      (a, b) =>
+        new Date(`${a.date}T${a.time}`).getTime() -
+        new Date(`${b.date}T${b.time}`).getTime()
+    );
 
   const minDate = normalizeDateString(new Date().toISOString());
 
@@ -482,16 +473,6 @@ export default function StudyPlanner() {
           </div>
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => {
-                if (!user) return alert('Please sign in to add sessions');
-                setShowAddModal(true);
-              }}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 rounded-xl font-semibold flex items-center space-x-2 transition-all duration-300 transform hover:scale-105 text-lg shadow"
-              style={{ minWidth: '160px' }}
-            >
-              <Plus className="w-6 h-6" />
-              <span>Add Session</span>
-            </button>
               onClick={() => {
                 if (!user) return alert('Please sign in to add sessions');
                 setShowAddModal(true);
