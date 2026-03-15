@@ -199,6 +199,8 @@ export default function ChatInterface() {
     chatContext.setMessages((prev) => [...prev, botMessage]);
   };
   const [playing, setPlaying] = useState<Record<string, string>>({});
+  const [expandedAttachments, setExpandedAttachments] = useState<Set<string>>(new Set());
+
 
   const escapeHtml = (unsafe: string) =>
     unsafe
@@ -339,9 +341,9 @@ export default function ChatInterface() {
 
         // Fetch related YouTube videos for the user's prompt and attach to the bot message
         try {
-          const vids = await youtubeSearch(userMessage.content, 2);
+          const vids = await youtubeSearch(userMessage.content, 6);
           if (vids && vids.success && vids.videos && vids.videos.length) {
-            const attachments = vids.videos.slice(0, 2).map((v: any) => ({ ...v, type: 'youtube' }));
+            const attachments = vids.videos.slice(0, 6).map((v: any) => ({ ...v, type: 'youtube' }));
             chatContext.setMessages((prev) => {
               const updated = [...prev];
               const lastIdx = updated.length - 1;
@@ -620,33 +622,62 @@ export default function ChatInterface() {
                         {/* Attachments (e.g., YouTube results) */}
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-3 space-y-3">
-                            {message.attachments.map((att: any, idx: number) => (
-                              <div key={idx} className="flex flex-col">
-                                <div
-                                  className="flex items-center space-x-3 cursor-pointer hover:bg-slate-800 p-2 rounded"
-                                  onClick={() => setPlaying((prev) => ({ ...prev, [message.id]: att.videoId }))}
-                                >
-                                  {att.thumbnail && (
-                                    <img src={att.thumbnail} alt={att.title} className="w-28 h-16 object-cover rounded" />
+                            <div className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                              Suggested Videos
+                            </div>
+                            {(() => {
+                              const isExpanded = expandedAttachments.has(message.id);
+                              const visibleAttachments = isExpanded ? message.attachments : message.attachments.slice(0, 2);
+                              return (
+                                <>
+                                  {visibleAttachments.map((att: any, idx: number) => (
+                                    <div key={idx} className="flex flex-col">
+                                      <div
+                                        className="flex items-center space-x-3 cursor-pointer hover:bg-slate-800 p-2 rounded"
+                                        onClick={() => setPlaying((prev) => ({ ...prev, [message.id]: att.videoId }))}
+                                      >
+                                        {att.thumbnail && (
+                                          <img src={att.thumbnail} alt={att.title} className="w-28 h-16 object-cover rounded" />
+                                        )}
+                                        <div className="flex-1">
+                                          <div className="text-sm text-slate-100 font-medium">{att.title}</div>
+                                          <div className="text-xs text-slate-400">{att.channelTitle}</div>
+                                        </div>
+                                      </div>
+                                      {playing[message.id] === att.videoId && (
+                                        <div className="mt-3">
+                                          <iframe
+                                            className="w-full h-64 rounded-lg"
+                                            src={`https://www.youtube.com/embed/${att.videoId}?autoplay=1`}
+                                            title={att.title}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {message.attachments.length > 2 && (
+                                    <button
+                                      onClick={() => {
+                                        setExpandedAttachments((prev) => {
+                                          const newSet = new Set(prev);
+                                          if (isExpanded) {
+                                            newSet.delete(message.id);
+                                          } else {
+                                            newSet.add(message.id);
+                                          }
+                                          return newSet;
+                                        });
+                                      }}
+                                      className="text-sm text-purple-400 hover:text-purple-300 mt-2"
+                                    >
+                                      {isExpanded ? 'Show less' : `Show ${message.attachments.length - 2} more`}
+                                    </button>
                                   )}
-                                  <div className="flex-1">
-                                    <div className="text-sm text-slate-100 font-medium">{att.title}</div>
-                                    <div className="text-xs text-slate-400">{att.channelTitle}</div>
-                                  </div>
-                                </div>
-                                {playing[message.id] === att.videoId && (
-                                  <div className="mt-3">
-                                    <iframe
-                                      className="w-full h-64 rounded-lg"
-                                      src={`https://www.youtube.com/embed/${att.videoId}?autoplay=1`}
-                                      title={att.title}
-                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                      allowFullScreen
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
