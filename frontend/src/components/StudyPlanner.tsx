@@ -51,11 +51,16 @@ function toLocalDateStr(dateStr: string): string {
   }
 }
 
-// Utility function to normalize date string format
+// Utility function to normalize date string format (local date, avoids UTC shift)
 function normalizeDateString(dateStr: string): string {
   if (!dateStr) return '';
   const date = new Date(dateStr);
-  return date.toISOString().split('T')[0];
+  if (isNaN(date.getTime())) return dateStr;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export default function StudyPlanner() {
