@@ -188,52 +188,39 @@ export default function Dashboard() {
       ];
 
   // Stat widgets for top row
-  const stats = useMemo(() => {
-    // Interpret the progress payload as monthly baseline data.
-    const monthHours = progress.totalHours || 0;
-    const monthCompleted = progress.completedSessions || 0;
-    const monthAverage = progress.completionRate || 0;
-
-    // Approximate weekly values from monthly numbers (simple division).
-    const weekHours = Math.round((monthHours / 4) * 10) / 10;
-    const weekCompleted = Math.round(monthCompleted / 4);
-
-    const hours = selectedTimeframe === "week" ? weekHours : monthHours;
-    const completedSessions = selectedTimeframe === "week" ? weekCompleted : monthCompleted;
-
-    const streakDays = Math.min(30, Math.round(hours / 2));
-
-    return [
+  const stats = useMemo(
+    () => [
       {
         label: "Study Hours",
-        value: isNewUser ? 0 : hours?.toFixed(1) || 0,
+        value: isNewUser ? 0 : progress.totalHours?.toFixed(1) || 0,
         change: isNewUser ? "+0%" : "+12%",
         icon: Clock,
         color: "purple",
       },
       {
         label: "Completed Sessions",
-        value: isNewUser ? 0 : completedSessions,
+        value: isNewUser ? 0 : progress.completedSessions || 0,
         change: isNewUser ? "+0%" : "+8%",
         icon: CheckCircle2,
         color: "green",
       },
       {
         label: "Average Score",
-        value: isNewUser ? "—" : `${monthAverage}%`,
+        value: isNewUser ? "—" : `${progress.completionRate || 0}%`,
         change: isNewUser ? "+0%" : "+5%",
         icon: Target,
         color: "blue",
       },
       {
         label: "Streak Days",
-        value: isNewUser ? "—" : streakDays,
+        value: isNewUser ? "—" : Math.min(30, Math.round((progress.totalHours || 0) / 2)),
         change: isNewUser ? "+0%" : "+3%",
         icon: Award,
         color: "orange",
       },
-    ];
-  }, [progress, isNewUser, selectedTimeframe]);
+    ],
+    [progress, isNewUser]
+  );
 
   const studyProgressData = useMemo(() => {
     if (isNewUser) {
