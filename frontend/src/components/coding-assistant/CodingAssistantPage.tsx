@@ -26,7 +26,7 @@ export default function CodingAssistantPage() {
   }, [user, refreshTrigger]);
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-white selection:bg-purple-500/30">
+    <div className="min-h-screen bg-gray-900 text-white selection:bg-purple-500/30">
       {/* Abstract Background Gradients */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[120px] mix-blend-screen animate-pulse"></div>
@@ -34,7 +34,7 @@ export default function CodingAssistantPage() {
         <div className="absolute top-[20%] left-[20%] w-[300px] h-[300px] bg-blue-600/10 rounded-full blur-[80px] mix-blend-screen"></div>
       </div>
 
-      <div className="relative z-10 max-w-[95%] xl:max-w-7xl mx-auto px-4 py-8">
+      <main className="ml-64 relative z-10 max-w-[95%] xl:max-w-7xl mx-auto px-4 py-8">
         {!selectedProblemId ? (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Header Section */}
@@ -110,7 +110,7 @@ export default function CodingAssistantPage() {
             />
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
