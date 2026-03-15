@@ -52,6 +52,13 @@ export default function Dashboard() {
     completionRate: 0,
   });
 
+  const [quizPerformance, setQuizPerformance] = useState({
+    avgPercentage: 0,
+    totalAttempts: 0,
+    bestScore: 0,
+    lastAttempt: null as string | null,
+  });
+
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
   useEffect(() => {
@@ -85,7 +92,36 @@ export default function Dashboard() {
         });
       }
     }
+
+    async function fetchQuizPerformance() {
+      if (!user) return;
+      try {
+        const res = await fetch(
+          `${API_BASE}/quiz/performance?userId=${encodeURIComponent(user.id)}`
+        );
+        const data = await res.json();
+        if (data?.success && data.stats) {
+          setQuizPerformance(data.stats);
+        } else {
+          setQuizPerformance({
+            avgPercentage: 0,
+            totalAttempts: 0,
+            bestScore: 0,
+            lastAttempt: null,
+          });
+        }
+      } catch {
+        setQuizPerformance({
+          avgPercentage: 0,
+          totalAttempts: 0,
+          bestScore: 0,
+          lastAttempt: null,
+        });
+      }
+    }
+
     fetchProgress();
+    fetchQuizPerformance();
   }, [user]);
 
   useEffect(() => {
