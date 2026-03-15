@@ -201,15 +201,18 @@ def chat_history():
     session_id = int(session_id) if session_id else None
 
     # If session_id provided, allow fetching history by session even for anonymous users
-    if session_id is not None:
-        history = get_chat_history(user_id, limit, session_id)
-        return jsonify({"history": history})
+    try:
+        if session_id is not None:
+            history = get_chat_history(user_id, limit, session_id)
+            return jsonify({"success": True, "history": history})
 
-    if not user_id:
-        return jsonify({"history": []})
+        if not user_id:
+            return jsonify({"success": True, "history": []})
 
-    history = get_chat_history(user_id, limit, None)
-    return jsonify({"history": history})
+        history = get_chat_history(user_id, limit, None)
+        return jsonify({"success": True, "history": history})
+    except Exception as e:
+        return jsonify({"success": False, "history": [], "error": str(e)}), 500
 
 
 @chat_bp.route("/sessions", methods=["GET", "POST"])
