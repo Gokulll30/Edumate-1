@@ -34,6 +34,30 @@ export default function ProgressTracker() {
     { name: 'Machine Learning', progress: 57, totalHours: 13.1, completedSessions: 9, averageScore: 81, color: 'orange' }
   ];
 
+  const getPeriodStats = (period: 'week' | 'month') => {
+    // Use reasonable scaled values based on a monthly baseline.
+    const baselineHours = subjects.reduce((acc, s) => acc + s.totalHours, 0);
+    const baselineScore = Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length);
+
+    if (period === 'week') {
+      return {
+        totalHours: Number((baselineHours * 0.25).toFixed(1)),
+        averageScore: Math.min(95, Math.max(75, baselineScore - 2)),
+        completedAchievements: Math.min(3, achievements.filter((a) => a.completed).length),
+        studyStreak: 5,
+      };
+    }
+
+    return {
+      totalHours: Number((baselineHours * 1).toFixed(1)),
+      averageScore: baselineScore,
+      completedAchievements: achievements.filter((a) => a.completed).length,
+      studyStreak: 9,
+    };
+  };
+
+  const periodStats = getPeriodStats(selectedPeriod);
+
   const achievements: Achievement[] = [
     {
       id: '1',
@@ -76,14 +100,23 @@ export default function ProgressTracker() {
   ];
 
   const weeklyData = [
-    { day: 'Mon', hours: 3.8, score: 87 },
-    { day: 'Tue', hours: 2.4, score: 91 },
-    { day: 'Wed', hours: 4.1, score: 84 },
-    { day: 'Thu', hours: 3.6, score: 88 },
-    { day: 'Fri', hours: 2.9, score: 93 },
-    { day: 'Sat', hours: 5.5, score: 80 },
-    { day: 'Sun', hours: 4.2, score: 89 }
+    { label: 'Mon', hours: 3.8, score: 87 },
+    { label: 'Tue', hours: 2.4, score: 91 },
+    { label: 'Wed', hours: 4.1, score: 84 },
+    { label: 'Thu', hours: 3.6, score: 88 },
+    { label: 'Fri', hours: 2.9, score: 93 },
+    { label: 'Sat', hours: 5.5, score: 80 },
+    { label: 'Sun', hours: 4.2, score: 89 }
   ];
+
+  const monthlyData = [
+    { label: 'Week 1', hours: 14.3, score: 87 },
+    { label: 'Week 2', hours: 12.1, score: 90 },
+    { label: 'Week 3', hours: 15.4, score: 85 },
+    { label: 'Week 4', hours: 13.2, score: 88 }
+  ];
+
+  const activityData = selectedPeriod === 'week' ? weeklyData : monthlyData;
 
   const getSubjectColor = (color: string) => {
     const colors = {
@@ -105,10 +138,10 @@ export default function ProgressTracker() {
   };
 
   const overallStats = {
-    totalHours: subjects.reduce((acc, s) => acc + s.totalHours, 0),
-    averageScore: Math.round(subjects.reduce((acc, s) => acc + s.averageScore, 0) / subjects.length),
-    completedAchievements: achievements.filter(a => a.completed).length,
-    studyStreak: 9
+    totalHours: periodStats.totalHours,
+    averageScore: periodStats.averageScore,
+    completedAchievements: periodStats.completedAchievements,
+    studyStreak: periodStats.studyStreak,
   };
 
   return (
@@ -129,7 +162,6 @@ export default function ProgressTracker() {
           >
             <option value="week">This Week</option>
             <option value="month">This Month</option>
-            <option value="year">This Year</option>
           </select>
         </div>
 
@@ -184,26 +216,28 @@ export default function ProgressTracker() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Weekly Activity Chart */}
           <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-            <h3 className="text-xl font-semibold text-white mb-6">Weekly Activity</h3>
+            <h3 className="text-xl font-semibold text-white mb-6">
+              {selectedPeriod === 'week' ? 'Weekly Activity' : 'Monthly Activity'}
+            </h3>
             <div className="space-y-4">
-              {weeklyData.map((day, index) => (
-                <div key={day.day} className="flex items-center space-x-4">
-                  <span className="text-slate-400 text-sm w-8">{day.day}</span>
+              {activityData.map((item, index) => (
+                <div key={item.label} className="flex items-center space-x-4">
+                  <span className="text-slate-400 text-sm w-16">{item.label}</span>
                   <div className="flex flex-1 items-center gap-3">
                     <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${(day.hours / 6) * 100}%` }}
+                        style={{ width: `${Math.min(100, (item.hours / (selectedPeriod === 'week' ? 6 : 18)) * 100)}%` }}
                       />
                     </div>
-                    <span className="text-white text-sm w-10">{day.hours}h</span>
+                    <span className="text-white text-sm w-10">{item.hours}h</span>
                     <div className="flex-1 bg-slate-700 rounded-full h-3 overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${day.score}%` }}
+                        style={{ width: `${item.score}%` }}
                       />
                     </div>
-                    <span className="text-white text-sm w-10">{day.score}%</span>
+                    <span className="text-white text-sm w-10">{item.score}%</span>
                   </div>
                 </div>
               ))}
