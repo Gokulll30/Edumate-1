@@ -242,8 +242,8 @@ export default function Dashboard() {
       },
       {
         label: "Average Score",
-        value: isNewUser ? "—" : `${progress.completionRate || 0}%`,
-        change: isNewUser ? "+0%" : (progress.completionRate > 0 ? "+5%" : "+0%"),
+        value: isNewUser ? "—" : `${quizPerformance.avgPercentage || 0}%`,
+        change: isNewUser ? "+0%" : (quizPerformance.avgPercentage > 0 ? "+5%" : "+0%"),
         icon: Target,
         color: "blue",
       },
