@@ -18,7 +18,7 @@ interface Message {
   type: "user" | "bot";
   content: string;
   timestamp: Date;
-  attachments?: string[];
+  attachments?: any[];
 }
 
 interface LocalSession {
@@ -32,10 +32,19 @@ interface LocalSession {
 export default function ChatInterface() {
   const { user } = useAuth();
   const chatContext = useChatContext();
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
+    // Prefer scrolling the internal messages container so the sidebar stays visible
+    if (messagesContainerRef.current) {
+      const el = messagesContainerRef.current;
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+
+    // Fallback: scroll the page to the bottom of the message list
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -88,6 +97,33 @@ export default function ChatInterface() {
   }, [chatContext.currentSessionId]);
 
   // Helper to load history for a session id (number or temp string)
+  const getStoredAttachmentsForSession = (sessionId: number | string) => {
+    try {
+      const raw = localStorage.getItem(`chatAttachments_${sessionId}`);
+      if (!raw) return {};
+      return JSON.parse(raw) as Record<string, any[]>;
+    } catch {
+      return {};
+    }
+  };
+
+  const storeAttachmentsForSession = (
+    sessionId: number | string,
+    messageId: string,
+    attachments: any[]
+  ) => {
+    try {
+      const existing = getStoredAttachmentsForSession(sessionId);
+      existing[messageId] = attachments;
+      localStorage.setItem(
+        `chatAttachments_${sessionId}`,
+        JSON.stringify(existing)
+      );
+    } catch {
+      // ignore
+    }
+  };
+
   const loadHistoryForId = async (id: number | string | null) => {
     if (!id) return;
     try {
@@ -109,11 +145,14 @@ export default function ChatInterface() {
         return;
       }
 
+      const storedAttachments = getStoredAttachmentsForSession(id);
+
       const history: Message[] = (data.history || []).map((msg: any) => ({
         id: String(msg.id),
         type: msg.role === "user" ? "user" : "bot",
         content: msg.message || msg.content || "",
         timestamp: new Date(msg.created_at || msg.timestamp),
+        attachments: msg.attachments || storedAttachments[String(msg.id)] || [],
       }));
 
       chatContext.setMessages(history.length ? history : [
@@ -160,6 +199,27 @@ export default function ChatInterface() {
     chatContext.setMessages((prev) => [...prev, botMessage]);
   };
   const [playing, setPlaying] = useState<Record<string, string>>({});
+
+  const escapeHtml = (unsafe: string) =>
+    unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  const formatMessage = (text: string) => {
+    if (!text) return "";
+    const escaped = escapeHtml(text);
+
+    // Basic markdown/formatting cleanup (bold, italics, lists, line breaks)
+    const bold = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    const italics = bold.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    const lists = italics.replace(/^\s*([-*+]\s+)/gm, "• ");
+    const withLineBreaks = lists.replace(/\n/g, "<br/>");
+
+    return withLineBreaks;
+  };
 
   const handleSendMessage = async () => {
     if (!chatContext.inputValue.trim()) return;
@@ -281,6 +341,7 @@ export default function ChatInterface() {
         try {
           const vids = await youtubeSearch(userMessage.content, 2);
           if (vids && vids.success && vids.videos && vids.videos.length) {
+            const attachments = vids.videos.slice(0, 2).map((v: any) => ({ ...v, type: 'youtube' }));
             chatContext.setMessages((prev) => {
               const updated = [...prev];
               const lastIdx = updated.length - 1;
@@ -288,8 +349,12 @@ export default function ChatInterface() {
                 const last = updated[lastIdx];
                 updated[lastIdx] = {
                   ...last,
-                  attachments: vids.videos.slice(0,2).map((v: any) => ({ ...v, type: 'youtube' })),
+                  attachments,
                 } as any;
+
+                if (sessionIdToUse != null) {
+                  storeAttachmentsForSession(sessionIdToUse, String(last.id), attachments);
+                }
               }
               return updated;
             });
@@ -519,7 +584,7 @@ export default function ChatInterface() {
           {/* Right: Chat area */}
           <section className="flex-1 flex flex-col bg-gray-900">
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-900 pb-32">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-900 pb-32">
               <div className="w-full">
                 {chatContext.messages.map((message) => (
                   <div
@@ -551,9 +616,7 @@ export default function ChatInterface() {
                           : "bg-slate-800 border border-slate-700 text-white"
                           }`}
                       >
-                        <p className="whitespace-pre-wrap leading-relaxed">
-                          {message.content}
-                        </p>
+                        <p className="leading-relaxed" dangerouslySetInnerHTML={{ __html: formatMessage(message.content) }} />
                         {/* Attachments (e.g., YouTube results) */}
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-3 space-y-3">
