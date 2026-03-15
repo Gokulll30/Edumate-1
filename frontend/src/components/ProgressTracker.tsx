@@ -36,12 +36,20 @@ export default function ProgressTracker() {
 
   const achievements: Achievement[] = [
     {
+      id: '5',
+      title: 'AI Assistant Pro',
+      description: 'Use AI chat for 30+ conversations',
+      icon: Brain,
+      completed: true,
+      completedDate: '2026-03-10'
+    },
+    {
       id: '1',
       title: 'Study Streak Master',
       description: 'Study for 7 consecutive days',
       icon: Award,
       completed: true,
-      completedDate: '2025-11-12'
+      completedDate: '2026-02-25'
     },
     {
       id: '2',
@@ -49,7 +57,7 @@ export default function ProgressTracker() {
       description: 'Score above 90% in 5 quizzes',
       icon: Target,
       completed: true,
-      completedDate: '2025-11-10'
+      completedDate: '2026-01-12'
     },
     {
       id: '3',
@@ -64,14 +72,6 @@ export default function ProgressTracker() {
       description: 'Complete 100 study sessions',
       icon: BookOpen,
       completed: false
-    },
-    {
-      id: '5',
-      title: 'AI Assistant Pro',
-      description: 'Use AI chat for 30+ conversations',
-      icon: Brain,
-      completed: true,
-      completedDate: '2025-11-13'
     }
   ];
 
