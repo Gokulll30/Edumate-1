@@ -34,6 +34,47 @@ export default function ProgressTracker() {
     { name: 'Machine Learning', progress: 57, totalHours: 13.1, completedSessions: 9, averageScore: 81, color: 'orange' }
   ];
 
+  const achievements: Achievement[] = [
+    {
+      id: '1',
+      title: 'Study Streak Master',
+      description: 'Study for 7 consecutive days',
+      icon: Award,
+      completed: true,
+      completedDate: '2025-11-12'
+    },
+    {
+      id: '2',
+      title: 'Quiz Champion',
+      description: 'Score above 90% in 5 quizzes',
+      icon: Target,
+      completed: true,
+      completedDate: '2025-11-10'
+    },
+    {
+      id: '3',
+      title: 'Time Master',
+      description: 'Study for 50+ hours this month',
+      icon: Clock,
+      completed: false
+    },
+    {
+      id: '4',
+      title: 'Knowledge Seeker',
+      description: 'Complete 100 study sessions',
+      icon: BookOpen,
+      completed: false
+    },
+    {
+      id: '5',
+      title: 'AI Assistant Pro',
+      description: 'Use AI chat for 30+ conversations',
+      icon: Brain,
+      completed: true,
+      completedDate: '2025-11-13'
+    }
+  ];
+
   const getPeriodStats = (period: 'week' | 'month') => {
     // Use reasonable scaled values based on a monthly baseline.
     const baselineHours = subjects.reduce((acc, s) => acc + s.totalHours, 0);
@@ -57,16 +98,6 @@ export default function ProgressTracker() {
   };
 
   const periodStats = getPeriodStats(selectedPeriod);
-
-  const achievements: Achievement[] = [
-    {
-      id: '1',
-      title: 'Study Streak Master',
-      description: 'Study for 7 consecutive days',
-      icon: Award,
-      completed: true,
-      completedDate: '2025-11-12'
-    },
     {
       id: '2',
       title: 'Quiz Champion',
