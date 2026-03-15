@@ -456,14 +456,6 @@ export default function StudyPlanner() {
       .reduce((acc, s) => acc + s.duration, 0) / 60
   };
 
-  const upcomingSessions = sessions
-    .filter(s => !s.completed && new Date(`${s.date}T${s.time}`) >= new Date())
-    .sort(
-      (a, b) =>
-        new Date(`${a.date}T${a.time}`).getTime() -
-        new Date(`${b.date}T${b.time}`).getTime()
-    );
-
   const minDate = normalizeDateString(new Date().toISOString());
 
   return (
@@ -608,9 +600,9 @@ export default function StudyPlanner() {
         </div>
 
         {/* Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8">
           {/* Sessions List */}
-          <div className="lg:col-span-2 bg-slate-800 rounded-xl p-6 border border-slate-700 shadow">
+          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-semibold text-white">
                 Sessions for {toLocalDateStr(selectedDate)}
@@ -703,38 +695,6 @@ export default function StudyPlanner() {
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Upcoming Sessions */}
-          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow">
-            <h3 className="text-xl font-semibold text-white mb-6">Upcoming Sessions</h3>
-            <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
-              {upcomingSessions.length === 0 ? (
-                <div className="text-gray-500 text-center py-10">No upcoming sessions</div>
-              ) : (
-                upcomingSessions.map(session => {
-                  const Icon = getTypeIcon(session.type);
-                  return (
-                    <div key={session.id} className="flex items-center space-x-3 p-3 bg-slate-700/60 rounded-lg">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getTypeColor(
-                        session.type
-                      )}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <p className="text-white font-medium truncate">{session.title}</p>
-                          {session.calendar_event_id && <span className="text-xs">📅</span>}
-                        </div>
-                        <p className="text-slate-400 text-sm">
-                          {toLocalDateStr(session.date)} at {session.time}
-                        </p>
-                      </div>
                     </div>
                   );
                 })
