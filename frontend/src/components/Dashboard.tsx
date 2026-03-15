@@ -141,6 +141,17 @@ export default function Dashboard() {
     progress.testsTaken === 0 &&
     progress.completionRate === 0;
 
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.round(diffMs / 60000);
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.round(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  };
+
   const recentActivity: Activity[] = isNewUser
     ? []
     : [
@@ -148,70 +159,116 @@ export default function Dashboard() {
           type: "quiz",
           title: "Data Structures Quiz",
           score: 92,
-          time: "2 hours ago",
+          time: formatRelativeTime(new Date(Date.now() - 2 * 60 * 60 * 1000)),
         },
         {
           type: "study",
           title: "Algorithm Analysis",
           duration: "1.5 hours",
-          time: "4 hours ago",
+          time: formatRelativeTime(new Date(Date.now() - 5 * 60 * 60 * 1000)),
         },
         {
           type: "upload",
           title: "Computer Networks PDF",
           size: "2.3 MB",
-          time: "1 day ago",
+          time: formatRelativeTime(new Date(Date.now() - 24 * 60 * 60 * 1000)),
         },
-        { type: "chat", title: "AI Study Session", messages: 12, time: "1 day ago" },
+        {
+          type: "chat",
+          title: "AI Study Session",
+          messages: 12,
+          time: formatRelativeTime(new Date(Date.now() - 36 * 60 * 60 * 1000)),
+        },
+        {
+          type: "quiz",
+          title: "Algorithm Retake",
+          score: 88,
+          time: formatRelativeTime(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)),
+        },
       ];
 
   // Stat widgets for top row
-  const stats = useMemo(
-    () => [
+  const stats = useMemo(() => {
+    // Interpret the progress payload as monthly baseline data.
+    const monthHours = progress.totalHours || 0;
+    const monthCompleted = progress.completedSessions || 0;
+    const monthAverage = progress.completionRate || 0;
+
+    // Approximate weekly values from monthly numbers (simple division).
+    const weekHours = Math.round((monthHours / 4) * 10) / 10;
+    const weekCompleted = Math.round(monthCompleted / 4);
+
+    const hours = selectedTimeframe === "week" ? weekHours : monthHours;
+    const completedSessions = selectedTimeframe === "week" ? weekCompleted : monthCompleted;
+
+    const streakDays = Math.min(30, Math.round(hours / 2));
+
+    return [
       {
         label: "Study Hours",
-        value: isNewUser ? 0 : progress.totalHours?.toFixed(1) || 0,
+        value: isNewUser ? 0 : hours?.toFixed(1) || 0,
         change: isNewUser ? "+0%" : "+12%",
         icon: Clock,
         color: "purple",
       },
       {
         label: "Completed Sessions",
-        value: 2, // ALWAYS show 2!
+        value: isNewUser ? 0 : completedSessions,
         change: isNewUser ? "+0%" : "+8%",
         icon: CheckCircle2,
         color: "green",
       },
       {
         label: "Average Score",
-        value: isNewUser ? "—" : "87%",
+        value: isNewUser ? "—" : `${monthAverage}%`,
         change: isNewUser ? "+0%" : "+5%",
         icon: Target,
         color: "blue",
       },
       {
         label: "Streak Days",
-        value: isNewUser ? "—" : 12,
+        value: isNewUser ? "—" : streakDays,
         change: isNewUser ? "+0%" : "+3%",
         icon: Award,
         color: "orange",
       },
-    ],
-    [progress, isNewUser]
-  );
+    ];
+  }, [progress, isNewUser, selectedTimeframe]);
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const studyProgressData = isNewUser
-    ? weekDays.map((day) => ({ day, value: 0, label: "—" }))
-    : [
-        { day: "Mon", value: 3, label: "3h" },
-        { day: "Tue", value: 3, label: "3h" },
-        { day: "Wed", value: 3, label: "3h" },
-        { day: "Thu", value: 5, label: "5h" },
-        { day: "Fri", value: 3, label: "3h" },
-        { day: "Sat", value: 6, label: "6h" },
-        { day: "Sun", value: 5, label: "5h" },
+  const studyProgressData = useMemo(() => {
+    if (isNewUser) {
+      return [
+        { day: "Mon", value: 0, label: "—" },
+        { day: "Tue", value: 0, label: "—" },
+        { day: "Wed", value: 0, label: "—" },
+        { day: "Thu", value: 0, label: "—" },
+        { day: "Fri", value: 0, label: "—" },
+        { day: "Sat", value: 0, label: "—" },
+        { day: "Sun", value: 0, label: "—" },
       ];
+    }
+
+    if (selectedTimeframe === "month") {
+      // Show a simple 4-week summary for monthly view
+      return [
+        { day: "Week 1", value: 12, label: "12h" },
+        { day: "Week 2", value: 10, label: "10h" },
+        { day: "Week 3", value: 14, label: "14h" },
+        { day: "Week 4", value: 11, label: "11h" },
+      ];
+    }
+
+    // Default to week view
+    return [
+      { day: "Mon", value: 3, label: "3h" },
+      { day: "Tue", value: 3, label: "3h" },
+      { day: "Wed", value: 3, label: "3h" },
+      { day: "Thu", value: 5, label: "5h" },
+      { day: "Fri", value: 3, label: "3h" },
+      { day: "Sat", value: 6, label: "6h" },
+      { day: "Sun", value: 5, label: "5h" },
+    ];
+  }, [isNewUser, selectedTimeframe]);
 
   const getStatColor = (color: string) => {
     const colors = {
@@ -311,7 +368,6 @@ export default function Dashboard() {
               >
                 <option value="week">This Week</option>
                 <option value="month">This Month</option>
-                <option value="year">This Year</option>
               </select>
             </div>
             {/* Custom Styled Progress Lines */}
