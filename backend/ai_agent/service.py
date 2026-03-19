@@ -205,7 +205,6 @@ Generate a study plan with specific recommendations. Return ONLY this JSON (no m
                             scheduled_date=test_date,
                             difficulty=topic_data.get('suggested_difficulty', 'medium')
                         )
-                        print(f"📅 Created GCal event for {topic_data['topic']}")
                     except Exception as gcal_error:
                         print(f"⚠️ GCal creation failed (test still scheduled): {gcal_error}")
 
@@ -242,7 +241,6 @@ Generate a study plan with specific recommendations. Return ONLY this JSON (no m
                             scheduled_date=test_date,
                             difficulty=topic_data.get('suggested_difficulty', 'hard')
                         )
-                        print(f"📅 Created GCal event for {topic_data['topic']}")
                     except Exception as gcal_error:
                         print(f"⚠️ GCal creation failed (test still scheduled): {gcal_error}")
 

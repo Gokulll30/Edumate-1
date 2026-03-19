@@ -353,3 +353,57 @@ def disconnect_calendar():
     cur.close()
     
     return jsonify({'success': True})
+
+
+def create_calendar_event_for_test(user_id: int, topic: str, scheduled_date, difficulty: str):
+    """
+    Helper function to create a Google Calendar event for an AI-scheduled test.
+    Called from ai_agent.service during test scheduling.
+    """
+    try:
+        service = get_calendar_service(user_id)
+        if not service:
+            print(f"⚠️ Calendar not connected for user {user_id}, skipping GCal event")
+            return False
+        
+        # Format the scheduled_date
+        if isinstance(scheduled_date, str):
+            test_date = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+        else:
+            test_date = scheduled_date
+        
+        # Create event with test duration of 60 minutes
+        start_datetime = test_date.replace(hour=10, minute=0, second=0)  # Default to 10 AM
+        end_datetime = start_datetime + timedelta(minutes=60)
+        
+        event = {
+            'summary': f'📝 {topic} ({difficulty.capitalize()} Test)',
+            'description': f'AI-Scheduled {difficulty.capitalize()} Difficulty Test\nTopic: {topic}',
+            'start': {
+                'dateTime': start_datetime.isoformat(),
+                'timeZone': 'Asia/Kolkata',
+            },
+            'end': {
+                'dateTime': end_datetime.isoformat(),
+                'timeZone': 'Asia/Kolkata',
+            },
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'popup', 'minutes': 30},
+                    {'method': 'email', 'minutes': 24 * 60},
+                ],
+            },
+        }
+        
+        created_event = service.events().insert(
+            calendarId='primary',
+            body=event
+        ).execute()
+        
+        print(f"✅ Created Google Calendar event for {topic}: {created_event['id']}")
+        return True
+        
+    except Exception as e:
+        print(f"⚠️ Failed to create calendar event for {topic}: {str(e)}")
+        return False
